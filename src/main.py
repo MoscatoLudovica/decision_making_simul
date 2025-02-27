@@ -16,11 +16,13 @@ def main(argv):
             print_usage()
         elif opt in ("-c", "--config"):
             configfile = arg
-    if my_config.mode["multi_threading"]:
-        # TODO multi threading for batching
-        return
+    my_config = config.Config(configfile)
+    if my_config.mode["multi_processing"]:
+        # TODO multi processing for batching multiple simulations or streaming single simulation
+        pass
     else:
-        my_config = config.Config(configfile)
-
+        # TODO single processing for batching or streaming
+        pass
+    
 if __name__ == "__main__":
     main(sys.argv[1:])

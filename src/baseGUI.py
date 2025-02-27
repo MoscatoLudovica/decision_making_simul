@@ -15,4 +15,4 @@ class baseGUI():
         def create(self, config_elem:object): return baseGUI(config_elem)
 
     def __init__(self):
-        return
+        pass

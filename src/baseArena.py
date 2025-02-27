@@ -15,4 +15,4 @@ class BaseArena():
         def create(self, config_elem:object): return BaseArena(config_elem)
     
     def __init__(self,config_elem:object):
-        return
+        pass

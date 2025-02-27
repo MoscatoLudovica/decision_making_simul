@@ -13,5 +13,5 @@ class BaseDataHandling():
         def create(self, config_elem:object): return BaseDataHandling(config_elem)
     
     def __init__(self,config_elem:object):
-        return
+        pass
     

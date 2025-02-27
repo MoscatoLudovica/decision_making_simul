@@ -15,7 +15,7 @@
     },
     "objects":{
         "static":{
-            "_id": "option",
+            "_id": "obstacle",
             "number": 1,
             "shape": "circle",
             "radius": 0.1,
