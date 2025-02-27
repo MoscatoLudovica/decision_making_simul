@@ -1,0 +1,66 @@
+{
+    "mode":{
+        "multi_processing": false
+    },
+    "environment":{
+        "simulation":{
+            "ticks_per_second": 10,
+            "time_limit": 1000,
+            "num_runs": 1
+        },
+        "arena":{
+            "_id": "square",
+            "side": 1
+        }
+    },
+    "objects":{
+        "static":{
+            "_id": "option",
+            "number": 1,
+            "shape": "circle",
+            "radius": 0.1,
+            "color": "red"
+        },
+        "movable":{
+            "_id": "option",
+            "number": 1,
+            "shape": "circle",
+            "radius": 0.1,
+            "color": "green"
+        }
+    },
+    "agents":{
+        "ticks_per_second": 30,
+        "type_1":{
+            "number": 3,
+            "logic":{
+                "_id": "spinModel"
+            },
+            "body":{
+                "_id": "circular",
+                "radius": 0.1,
+                "color": "blue",
+                "max_speed": 0.1,
+                "max_spin": 0.1
+            },
+            "sensor":{
+                "_id": "rangeSensor",
+                "range": 0.5,
+                "angle": 180,
+                "noise": 0.1
+            }
+        }
+    },
+    "results":{
+        "_id": "basic",
+        "save": true,
+        "base_path": "../data/"
+
+    },
+    "gui":{
+        "_id": "2D",
+        "render": true,
+        "show_trajectories": false,
+        "show_communication": false,
+        "pixels_per_meter": 100
+}}
