@@ -1,66 +1,85 @@
 {
-    "mode":{
-        "multi_processing": false
-    },
     "environment":{
-        "simulation":{
-            "ticks_per_second": 10,
-            "time_limit": 1000,
-            "num_runs": 1
+        "multi_processing": false,
+        "ticks_per_second": 10,
+        "time_limit": 1000,
+        "num_runs": 1,
+        "random_seed": 0,
+        "results":{
+            "_id": "basic",
+            "save": true,
+            "base_path": "../data/"
+            
         },
-        "arena":{
-            "_id": "square",
-            "side": 1
-        }
-    },
-    "objects":{
-        "static":{
-            "_id": "obstacle",
-            "number": 1,
-            "shape": "circle",
-            "radius": 0.1,
-            "color": "red"
+        "gui":{
+            "_id": "2D",
+            "render": true,
+            "show_trajectories": false,
+            "show_communication": false,
+            "pixels_per_meter": 100
         },
-        "movable":{
-            "_id": "option",
-            "number": 1,
-            "shape": "circle",
-            "radius": 0.1,
-            "color": "green"
-        }
-    },
-    "agents":{
-        "ticks_per_second": 30,
-        "type_1":{
-            "number": 3,
-            "logic":{
-                "_id": "spinModel"
+        "arenas":{
+            "arena_0":{
+                "_id": "rectangle",
+                "width": 1,
+                "height": 1,
+                "color": "white"
             },
-            "body":{
-                "_id": "circular",
-                "radius": 0.1,
-                "color": "blue",
-                "max_speed": 0.1,
-                "max_spin": 0.1
-            },
-            "sensor":{
-                "_id": "rangeSensor",
-                "range": 0.5,
-                "angle": 180,
-                "noise": 0.1
+            "arena_1":{
+                "_id": "circle",
+                "radius": 1,
+                "color": "white"
             }
-        }
-    },
-    "results":{
-        "_id": "basic",
-        "save": true,
-        "base_path": "../data/"
-
-    },
-    "gui":{
-        "_id": "2D",
-        "render": true,
-        "show_trajectories": false,
-        "show_communication": false,
-        "pixels_per_meter": 100
-}}
+        },
+        "objects":{
+            "static_0":{
+                "_id": "obstacle",
+                "number": [1,3],
+                "shape": "circle",
+                "radius": 0.01,
+                "color": "red"
+            },
+            "static_1":{
+                "_id": "obstacle",
+                "number": [1,2],
+                "shape": "square",
+                "side": 0.01,
+                "color": "red"
+            },
+            "movable_0":{
+                "_id": "item",
+                "number": [1,1],
+                "shape": "circle",
+                "radius": 0.01,
+                "color": "green"
+            },
+            "movable_1":{
+                "_id": "item",
+                "number": [1,0],
+                "shape": "square",
+                "side": 0.01,
+                "color": "green"
+            }
+        },
+        "agents":{
+            "type_0":{
+                "ticks_per_second": 30,
+                "number": [3,2],
+                "body":{
+                    "_id": "circle",
+                    "radius": 0.1,
+                    "color": "blue"
+                }
+            },
+            "type_1":{
+                "ticks_per_second": 30,
+                "number": [1,2],
+                "body":{
+                    "_id": "square",
+                    "side": 0.1,
+                    "color": "blue"
+                }
+            }
+        }   
+    }
+}
