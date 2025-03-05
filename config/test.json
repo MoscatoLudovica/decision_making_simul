@@ -20,63 +20,27 @@
         },
         "arenas":{
             "arena_0":{
-                "_id": "rectangle",
-                "width": 1,
-                "height": 1,
-                "color": "white"
-            },
-            "arena_1":{
-                "_id": "circle",
-                "radius": 1,
+                "_id": "square",
+                "side": 1,
                 "color": "white"
             }
         },
         "objects":{
             "static_0":{
                 "_id": "obstacle",
-                "number": [1,3],
+                "number": [1],
                 "shape": "circle",
                 "radius": 0.01,
                 "color": "red"
-            },
-            "static_1":{
-                "_id": "obstacle",
-                "number": [1,2],
-                "shape": "square",
-                "side": 0.01,
-                "color": "red"
-            },
-            "movable_0":{
-                "_id": "item",
-                "number": [1,1],
-                "shape": "circle",
-                "radius": 0.01,
-                "color": "green"
-            },
-            "movable_1":{
-                "_id": "item",
-                "number": [1,0],
-                "shape": "square",
-                "side": 0.01,
-                "color": "green"
             }
         },
         "agents":{
             "type_0":{
                 "ticks_per_second": 30,
-                "number": [3,2],
+                "number": [2],
                 "body":{
                     "_id": "circle",
                     "radius": 0.1,
-                    "color": "blue"
-                }
-            },
-            "type_1":{
-                "ticks_per_second": 30,
-                "number": [1,2],
-                "body":{
-                    "_id": "square",
-                    "side": 0.1,
                     "color": "blue"
                 }
             }

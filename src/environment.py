@@ -30,6 +30,10 @@ class SingleProcessEnvironment(Environment):
             if exp.gui["render"]:
                 my_gui = GuiFactory.create_gui(exp)
             my_arena = ArenaFactory.create_arena(exp,my_gui)
+            my_arena.initialize()
+            my_arena.run()
+            my_arena.close()
+        logging.info("All experiments completed successfully")
             
 
 class MultiProcessEnvironment(Environment):
