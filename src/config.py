@@ -29,21 +29,21 @@ class Config:
                     arenas.update({k:v})
                 else: raise KeyError
         except KeyError:
-            raise ValueError("The 'arenas' field is required with dictionary entries'arena_#'")
+            raise ValueError("The 'arenas' field is required with dictionary entries 'arena_#'")
         try:
             for k,v in environment['objects'].items():
                 if k.startswith('static_') or k.startswith('movable_'):
                     objects.update({k:v}) 
                 else: raise KeyError
         except KeyError:
-            raise ValueError("The 'objects' field is required with dictionary entries'static_#' or 'movable_#'")
+            raise ValueError("The 'objects' field is required with dictionary entries 'static_#' or 'movable_#'")
         try:
             for k, v in environment['agents'].items():
-                if k.startswith('type_'):
+                if k.startswith('static_') or k.startswith('movable_'):
                     agents.update({k: v})
                 else: raise KeyError
         except KeyError:
-            raise ValueError("The 'agents' field is required with dictionary entries'type_#'")
+            raise ValueError("The 'agents' field is required with dictionary entries 'static_#' or 'movable_#'")
         
         
         # Check required fields in agents
@@ -75,12 +75,15 @@ class Config:
         
         # Check required fields in arenas
         for arena in arenas.values():
-            if '_id' not in arena:
-                raise ValueError("Each arena must have '_id' field")
-            if "_id" not in ("abstract", "none"):
-                if "_color" not in arena:
-                    logging.info("Default arena floor color white")
-    
+            required_arena_fields = ["_id", "ticks_per_second"]
+            for field in required_arena_fields:
+                if field not in arena:
+                    raise ValueError(f"The '{field}' field is required in the arena")
+                else:
+                    if field == "ticks_per_second":
+                        if not isinstance(arena[field], int) or arena[field] <= 0:
+                            raise ValueError(f"The '{field}' field must be a positive integer")
+                        
         # Check required fields in results
         if 'results' not in environment:
             raise ValueError("The 'results' field is required in the environment")
@@ -92,34 +95,33 @@ class Config:
         # Check required fields in gui
         if 'gui' not in environment:
             raise ValueError("The 'gui' field is required in the environment")
-        required_gui_fields = ["_id", "render"]
+        required_gui_fields = ["_id"]
         for field in required_gui_fields:
             if field not in environment['gui']:
                 raise ValueError(f"The '{field}' field is required in the gui")
         
         for i in range(num_experiments):
             for arena_key, arena_value in arenas.items():
-                required_fields = ["ticks_per_second", "time_limit", "num_runs", "results", "gui"]
+                required_fields = ["time_limit", "num_runs", "results", "gui", "render"]
                 for field in required_fields:
                     if field not in environment:
                         raise ValueError(f"The '{field}' field is required in the environment")
                     else:
-                        if field == "ticks_per_second":
-                            if not isinstance(environment[field], int) or environment[field] <= 0:
-                                raise ValueError(f"The '{field}' field must be a positive integer")
-                        elif field == "time_limit":
+                        if field == "time_limit":
                             if not isinstance(environment[field], int) or environment[field] <= 0:
                                 raise ValueError(f"The '{field}' field must be a positive integer")
                         elif field == "num_runs":
                             if not isinstance(environment[field], int) or environment[field] <= 0:
                                 raise ValueError(f"The '{field}' field must be a positive integer")
+                        elif field == "render":
+                            if not isinstance(environment[field], bool):
+                                raise ValueError(f"The '{field}' field must be boolean")
                 experiment = {
                     "environment": {
                         "multi_processing": environment.get("multi_processing",False),
-                        "ticks_per_second": environment.get("ticks_per_second"),
-                        "time_limit": environment.get("time_limit"),
-                        "num_runs": environment.get("num_runs"),
-                        "random_seed": environment.get("random_seed", -1),
+                        "time_limit": environment.get("time_limit",500),
+                        "num_runs": environment.get("num_runs",1),
+                        "render": environment.get("render", False),
                         "results": environment.get("results"),
                         "gui": environment.get("gui"),
                         "arena": arena_value,

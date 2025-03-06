@@ -1,94 +1,97 @@
 import logging
+from config import Config
 from random import Random
-from src.bodies.shapes2D import Shape2DFactory
-from src.bodies.shapes3D import Shape3DFactory
+from bodies.shapes2D import Shape2DFactory
+from bodies.shapes3D import Shape3DFactory
 from entity import EntityFactory
-from gui import GUI_2D, GUI_3D
 
 class ArenaFactory():
 
     @staticmethod
-    def create_arena(config_elem:object):
-        if config_elem.arena["_id"] == "abstract" or config_elem.arena["_id"] == "none":
+    def create_arena(config_elem:Config):
+        if config_elem.arena.get("_id") in ("abstract", "none", None):
             return AbstractArena(config_elem)
-        elif config_elem.arena["_id"] == "circle":
+        elif config_elem.arena.get("_id") == "circle":
             return CircularArena(config_elem)
-        elif config_elem.arena["_id"] == "rectangle":
+        elif config_elem.arena.get("_id") == "rectangle":
             return RectangularArena(config_elem)
-        elif config_elem.arena["_id"] == "square":
+        elif config_elem.arena.get("_id") == "square":
             return SquareArena(config_elem)
         else:
-            raise ValueError(f"Invalid arena type: {config_elem.arena['_id']}")
+            raise ValueError(f"Invalid shape type: {config_elem.arena['_id']} valid types are: none, abstract, circle, rectangle, square")
 
 class Arena():
     
-    def __init__(self, config_elem:object, gui:object):
-        self._id = config_elem.arena["_id"]
-        self.agents = {agent_type: [] for agent_type in config_elem.arena.get("agents", {}).keys()}
-        shape_type = config_elem.arena.get("_id", "none")
-        if shape_type == "abstract": shape_type = "none"
-        self.shape = Shape2DFactory.create_shape(shape_type, config_elem.arena)
-        self.objects = {object_type: [] for object_type in config_elem.arena.get("objects", {}).keys()}
-        self.gui = gui
-        self.ticks_per_second = config_elem.arena.get("ticks_per_second", 10)
-        self.time_limit = config_elem.environment.get("time_limit", 1000)
-        self.ticks_limit = self.time_limit * self.ticks_per_second
-        self.random_seed = config_elem.environment.get("random_seed", -1)
-        self.num_runs = config_elem.environment.get("num_runs", 1)
+    def __init__(self, config_elem:Config):
         self.random_generator = Random()
-        self.current_run = 0
+        self.ticks_per_second = config_elem.arena.get("ticks_per_second",10)
+        self.random_seed = config_elem.arena.get("random_seed",-1)
+        self._id = "none" if config_elem.arena.get("_id") == "abstract" else config_elem.arena.get("_id") 
+        self.shape = Shape2DFactory.create_shape(self._id, {key:val for key,val in config_elem.arena.items()})
+        self.agents = {agent_type: (config_elem.environment.get("agents").get(agent_type),[]) for agent_type in config_elem.environment.get("agents").keys()}
+        self.objects = {object_type: (config_elem.environment.get("objects").get(object_type),[]) for object_type in config_elem.environment.get("objects").keys()}
+    
+    def get_id(self):
+        return self._id
+    
+    def get_seed(self):
+        return self.random_seed
 
+    def increment_seed(self):
+        self.random_seed += 1
+        
+    def reset_seed(self):
+        self.random_seed = 0
+        
     def set_random_seed(self):
-        if self.num_runs > 1:
-            self.random_generator.seed(self.current_run)
+        if self.random_seed > -1:
+            self.random_generator.seed(self.random_seed)
         else:
-            if self.random_seed > -1:
-                self.random_generator.seed(self.random_seed)
-            else:
-                self.random_generator.seed()
+            self.random_generator.seed()
 
     def initialize(self):
         self.elapsed_ticks = 0
-        self.current_run += 1
         self.set_random_seed()
-        if self.gui is not None:
-            self.gui.initialize()
+        # TODO agents initialization
+        for key,(config,entities) in self.agents.items():
+            for n in range(config["number"]):
+                entities.append(EntityFactory.create_entity(entity_type="agent_"+key,config_elem=config,_id=n))
+        # TODO objects initialization
     
+    def reset(self):
+        pass
+
     def run(self):
-        for _ in range(self.num_runs):
-            logging.info(f"Starting run {self.current_run}/{self.num_runs}")
-            try:
-                while self.elapsed_ticks < self.ticks_limit:
-                    for _ in range(self.ticks_per_second):
-                        self.update()
-            except KeyboardInterrupt:
-                logging.info("Simulation interrupted by user")
-                break
-            logging.info(f"Run {self.current_run}/{self.num_runs} completed")
-            if self.current_run < self.num_runs: self.initialize()
-        logging.info("All runs completed")
+        for _ in range(self.ticks_per_second):
+            self.update()
 
     def update(self):
-        for agent_type, agents in self.agents.items():
-            for agent in agents:
-                agent.update(self.ticks_per_second,self.shape,self.objects)
-        for object_type, objects in self.objects.items():
-            for obj in objects:
-                obj.update()
-        if self.gui is not None:
-            self.gui.update()
         self.elapsed_ticks += 1
 
     def close(self):
-        if self.gui is not None:
-            self.gui.close()
+        pass
 
 
 class AbstractArena(Arena):
     
-    def __init__(self, config_elem:object, gui:object):
-        super().__init__(config_elem, gui)
+    def __init__(self, config_elem:Config):
+        super().__init__(config_elem)
         logging.info("Abstract arena created successfully")
+    
+    def get_id(self):
+        return super().get_id()
+    
+    def get_seed(self):
+        return super().get_seed()
+
+    def increment_seed(self):
+        super().increment_seed()
+        
+    def reset_seed(self):
+        super().reset_seed()
+        
+    def set_random_seed(self):
+        super().set_random_seed()
 
     def initialize(self):
         super().initialize()
@@ -102,14 +105,63 @@ class AbstractArena(Arena):
     def close(self):
         super().close()
 
-class CircularArena(Arena):
+class SolidArena(Arena):
     
-    def __init__(self, config_elem:object, gui:object):
-        super().__init__(config_elem, gui)
+    def __init__(self, config_elem:Config):
+        super().__init__(config_elem)
+    
+    def get_id(self):
+        return super().get_id()
+    
+    def get_seed(self):
+        return super().get_seed()
+
+    def increment_seed(self):
+        super().increment_seed()
+        
+    def reset_seed(self):
+        super().reset_seed()
+        
+    def set_random_seed(self):
+        super().set_random_seed()
+
+    def initialize(self):
+        super().initialize()
+        # TODO agents position initialization
+        # TODO objects position initialization
+
+    def run(self):
+        super().run()
+    
+    def update(self):
+        super().update()
+    
+    def close(self):
+        super().close()
+
+class CircularArena(SolidArena):
+    
+    def __init__(self, config_elem:Config):
+        super().__init__(config_elem)
         self.height = config_elem.arena.get("height", 1)
         self.radius = config_elem.arena.get("radius", 1)
         self.color = config_elem.arena.get("color", "white")
         logging.info("Circular arena created successfully")
+    
+    def get_id(self):
+        return super().get_id()
+    
+    def get_seed(self):
+        return super().get_seed()
+
+    def increment_seed(self):
+        super().increment_seed()
+        
+    def reset_seed(self):
+        super().reset_seed()
+        
+    def set_random_seed(self):
+        super().set_random_seed()
 
     def initialize(self):
         super().initialize()
@@ -123,15 +175,30 @@ class CircularArena(Arena):
     def close(self):
         super().close()
 
-class RectangularArena(Arena):
+class RectangularArena(SolidArena):
     
-    def __init__(self, config_elem:object, gui:object):
-        super().__init__(config_elem, gui)
+    def __init__(self, config_elem:Config):
+        super().__init__(config_elem)
         self.height = config_elem.arena.get("height", 1)
         self.length = config_elem.arena.get("length", 1)
         self.width = config_elem.arena.get("width", 1)
         self.color = config_elem.arena.get("color", "white")
         logging.info("Rectangular arena created successfully")
+    
+    def get_id(self):
+        return super().get_id()
+    
+    def get_seed(self):
+        return super().get_seed()
+
+    def increment_seed(self):
+        super().increment_seed()
+        
+    def reset_seed(self):
+        super().reset_seed()
+        
+    def set_random_seed(self):
+        super().set_random_seed()
 
     def initialize(self):
         super().initialize()
@@ -145,14 +212,29 @@ class RectangularArena(Arena):
     def close(self):
         super().close()
 
-class SquareArena(Arena):
+class SquareArena(SolidArena):
     
-    def __init__(self, config_elem:object, gui:object):
-        super().__init__(config_elem, gui)
+    def __init__(self, config_elem:Config):
+        super().__init__(config_elem)
         self.height = config_elem.arena.get("height", 1)
         self.side = config_elem.arena.get("side", 1)
         self.color = config_elem.arena.get("color", "white")
         logging.info("Square arena created successfully")
+    
+    def get_id(self):
+        return super().get_id()
+    
+    def get_seed(self):
+        return super().get_seed()
+
+    def increment_seed(self):
+        super().increment_seed()
+        
+    def reset_seed(self):
+        super().reset_seed()
+        
+    def set_random_seed(self):
+        super().set_random_seed()
 
     def initialize(self):
         super().initialize()

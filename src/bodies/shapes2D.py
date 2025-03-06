@@ -1,9 +1,9 @@
 import math
-from src.geometry_utils.vector2D import Vector2D
+from geometry_utils.vector2D import Vector2D
 
 class Shape2DFactory:
     @staticmethod
-    def create_shape(shape_type:str,config_elem:object):
+    def create_shape(shape_type:str,config_elem:dict):
         if shape_type == "circle":
             return Circle(config_elem)
         elif shape_type == "square":
@@ -18,9 +18,11 @@ class Shape2DFactory:
             raise ValueError(f"Unknown shape type: {shape_type}")
         
 class Shape:
-    def __init__(self,config_elem:object,center: Vector2D = Vector2D()):
+    def __init__(self,config_elem:dict,center: Vector2D = Vector2D()):
         self.center = center
-        self.height = config_elem.get("height", 1.0)
+        self.height = 1   # special entry used only for arena
+        self.floor = 0.05 # special entry used only for arena
+        self.color = config_elem.get("color", "white")
 
     def configure(self):
         pass
@@ -31,7 +33,7 @@ class Shape:
     def perimeter(self) -> float:
         pass
 
-    def vertices(self)  -> list[Vector2D]:
+    def vertices(self)  -> list:
         pass
 
     def set_center(self, new_center: Vector2D):
@@ -41,7 +43,7 @@ class Shape:
         pass
 
 class Circle(Shape):
-    def __init__(self, config_elem:object):
+    def __init__(self, config_elem:dict):
         super().__init__(config_elem=config_elem)
         self.radius = config_elem.get("radius", 1.0)
         self._vertices = []
@@ -71,7 +73,7 @@ class Circle(Shape):
 
 class Square(Shape):
 
-    def __init__(self, config_elem:object):
+    def __init__(self, config_elem:dict):
         super().__init__(config_elem=config_elem)
         self.side = config_elem.get("side", 1.0)
         self.set_vertices()
@@ -149,7 +151,7 @@ class Rectangle(Shape):
         for i in range(len(self._vertices)):
             self._vertices[i] = self._vertices[i].v_rotate(self.center, angle_rad)
 class Triangle(Shape):
-    def __init__(self, config_elem:object):
+    def __init__(self, config_elem:dict):
         super().__init__(config_elem=config_elem)
         angle1 = config_elem.get("angle1", 60)
         angle2 = config_elem.get("angle2", 60)

@@ -25,6 +25,7 @@ def main(argv):
     try:
         my_config = Config(config_path=configfile)
         my_env = EnvironmentFactory.create_environment(my_config)
+        my_env.start()
     except Exception as e:
         logging.fatal(f"Failed to create environment: {e}")
         sys.exit(1)

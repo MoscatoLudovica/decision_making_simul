@@ -1,10 +1,9 @@
 {
     "environment":{
         "multi_processing": false,
-        "ticks_per_second": 10,
-        "time_limit": 1000,
+        "time_limit": 100,
         "num_runs": 1,
-        "random_seed": 0,
+        "render": true,
         "results":{
             "_id": "basic",
             "save": true,
@@ -13,13 +12,14 @@
         },
         "gui":{
             "_id": "2D",
-            "render": true,
             "show_trajectories": false,
             "show_communication": false,
             "pixels_per_meter": 100
         },
         "arenas":{
             "arena_0":{
+                "random_seed": -1,
+                "ticks_per_second": 10,
                 "_id": "square",
                 "side": 1,
                 "color": "white"
@@ -29,18 +29,30 @@
             "static_0":{
                 "_id": "obstacle",
                 "number": [1],
-                "shape": "circle",
-                "radius": 0.01,
+                "shape": "cube",
+                "side": 1,
+                "pose":[[1,0,0],[0,1,0],[0,0,1]],
                 "color": "red"
             }
         },
         "agents":{
-            "type_0":{
-                "ticks_per_second": 30,
-                "number": [2],
+            "static_0":{
+                "ticks_per_second": 60,
+                "number": [1],
                 "body":{
-                    "_id": "circle",
-                    "radius": 0.1,
+                    "_id": "cylinder",
+                    "height": 0.3,
+                    "radius": 0.03,
+                    "color": "red"
+                }
+            },
+            "movable_1":{
+                "ticks_per_second": 30,
+                "number": [5],
+                "body":{
+                    "_id": "cylinder",
+                    "height": 0.02,
+                    "radius": 0.033,
                     "color": "blue"
                 }
             }

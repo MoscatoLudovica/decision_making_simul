@@ -1,33 +1,33 @@
 import math
-from src.geometry_utils.vector3D import Vector3D
+from geometry_utils.vector3D import Vector3D
 
 class Shape3DFactory:
     @staticmethod
-    def create_shape(shape_type:str):
+    def create_shape(shape_type:str,config_elem:dict):
         if shape_type == "sphere":
-            return Sphere()
+            return Sphere(config_elem)
         elif shape_type == "cube":
-            return Cube()
+            return Cube(config_elem)
         elif shape_type == "cuboid":
-            return Cuboid()
+            return Cuboid(config_elem)
         elif shape_type == "pyramid":
-            return Pyramid()
+            return Pyramid(config_elem)
         elif shape_type == "cone":
-            return Cone()
+            return Cone(config_elem)
         elif shape_type == "cylinder":
-            return Cylinder()
-        elif shape_type == "point":
-            return Shape()
+            return Cylinder(config_elem)
+        elif shape_type == "point" or shape_type == "none":
+            return Shape(config_elem)
         else:
             raise ValueError(f"Unknown shape type: {shape_type}")
         
 class Shape:
 
-    def __init__(self):
-        pass
-
-    def __init__(self, center: Vector3D):
+    def __init__(self,config_elem:dict,center: Vector3D = Vector3D()):
         self.center = center
+        if config_elem != None:
+            self.height = config_elem.get("height", 0.01)
+            self.color = config_elem.get("color", "white")
 
     def configure(self):
         pass
@@ -41,7 +41,7 @@ class Shape:
     def center_of_mass(self) -> Vector3D:
         pass
 
-    def vertices(self) -> list[Vector3D]:
+    def vertices(self) -> list:
         pass
 
     def translate(self, translation_vector):
@@ -74,13 +74,13 @@ class Shape:
 
 class Sphere(Shape):
 
-    def __init__(self, radius, center=Vector3D(0, 0, 0)):
-        super().__init__(center)
+    def __init__(self, radius:float, config_elem:dict):
+        super().__init__(config_elem=config_elem)
         self.radius = radius
         self.vertices_list = []
 
-    def configure(self, radius, new_center:Vector3D):
-        super().__init__(new_center)
+    def configure(self, radius:float, new_center:Vector3D):
+        super().__init__(config_elem=None,center=new_center)
         self.radius = radius
 
     def volume(self):
@@ -100,13 +100,13 @@ class Sphere(Shape):
 
 class Cube(Shape):
 
-    def __init__(self, side_length, center=Vector3D(0, 0, 0)):
-        super().__init__(center)
+    def __init__(self, side_length:float, config_elem:dict):
+        super().__init__(config_elem=config_elem)
         self.side_length = side_length
         self.set_vertices()
 
-    def configure(self, side_length, new_center:Vector3D):
-        super().__init__(new_center)
+    def configure(self, side_length:float, new_center:Vector3D):
+        super().__init__(config_elem=None,center=new_center)
         self.side_length = side_length
         self.set_vertices()
 
@@ -137,15 +137,15 @@ class Cube(Shape):
         ]
 
 class Cuboid(Shape):
-    def __init__(self, width, height, depth, center=Vector3D(0, 0, 0)):
-        super().__init__(center)
+    def __init__(self, width:float, height:float, depth:float, config_elem):
+        super().__init__(config_elem)
         self.width = width
         self.height = height
         self.depth = depth
         self.set_vertices()
 
-    def configure(self, width, height, depth, new_center:Vector3D):
-        super().__init__(new_center)
+    def configure(self, width:float, height:float, depth:float, new_center:Vector3D):
+        super().__init__(config_elem=None,center=new_center)
         self.width = width
         self.height = height
         self.depth = depth
@@ -180,15 +180,15 @@ class Cuboid(Shape):
         ]
 
 class Pyramid(Shape):
-    def __init__(self, base_length, base_width, height, center=Vector3D(0, 0, 0)):
-        super().__init__(center)
+    def __init__(self, base_length:float, base_width:float, height:float, config_elem:dict):
+        super().__init__(config_elem)
         self.base_length = base_length
         self.base_width = base_width
         self.height = height
         self.set_vertices()
 
-    def configure(self, base_length, base_width, height, new_center:Vector3D):            
-        super().__init__(new_center)
+    def configure(self, base_length:float, base_width:float, height:float, new_center:Vector3D):            
+        super().__init__(config_elem=None, center=new_center)
         self.base_length = base_length
         self.base_width = base_width
         self.height = height
@@ -223,14 +223,14 @@ class Pyramid(Shape):
         ]
 
 class Cone(Shape):
-    def __init__(self, radius:float, height:float, center=Vector3D(0, 0, 0)):
-        super().__init__(center)
+    def __init__(self, radius:float, height:float, config_elem:dict):
+        super().__init__(config_elem)
         self.radius = radius
         self.height = height
         self.vertices_list = []
 
-    def configure(self, radius:float, height:float, center:Vector3D):
-        super().__init__(center)
+    def configure(self, radius:float, height:float, new_center:Vector3D):
+        super().__init__(config_elem=None,center=new_center)
         self.radius = radius
         self.height = height
 
@@ -251,14 +251,14 @@ class Cone(Shape):
         self.vertices_list = []
 
 class Cylinder(Shape):
-    def __init__(self, radius:float, height:float, center=Vector3D(0, 0, 0)):
-        super().__init__(center)
+    def __init__(self, radius:float, height:float, config_elem):
+        super().__init__(config_elem)
         self.radius = radius
         self.height = height
         self.vertices_list = []
     
-    def configure(self, radius:float, height:float, center:Vector3D):
-        super().__init__(center)
+    def configure(self, radius:float, height:float, new_center:Vector3D):
+        super().__init__(config_elem=None,center=new_center)
         self.radius = radius
         self.height = height
 
