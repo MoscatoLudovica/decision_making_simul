@@ -53,7 +53,7 @@ class SingleProcessEnvironment(Environment):
                 for _ in range(self.time_limit):
                     self.arena.run()
                 self.arena.increment_seed()
-                if run < self.num_runs: self.arena.initialize()
+                if run < self.num_runs: self.arena.reset()
             gc.collect()
         logging.info("All experiments completed successfully")
     

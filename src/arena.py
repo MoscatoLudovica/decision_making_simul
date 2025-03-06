@@ -52,14 +52,22 @@ class Arena():
     def initialize(self):
         self.elapsed_ticks = 0
         self.set_random_seed()
-        # TODO agents initialization
+        # agents initialization
         for key,(config,entities) in self.agents.items():
             for n in range(config["number"]):
                 entities.append(EntityFactory.create_entity(entity_type="agent_"+key,config_elem=config,_id=n))
-        # TODO objects initialization
-    
+        # objects initialization
+        for key,(config,entities) in self.objects.items():
+            for n in range(config["number"]):
+                entities.append(EntityFactory.create_entity(entity_type="object_"+key,config_elem=config,_id=n))
+
     def reset(self):
-        pass
+        for (config,entities) in self.agents.values():
+            for n in range(len(entities)):
+                entities[n].reset()
+        for (config,entities) in self.objects.values():
+            for n in range(len(entities)):
+                entities[n].reset()
 
     def run(self):
         for _ in range(self.ticks_per_second):

@@ -18,12 +18,32 @@ class EntityFactory:
 class Entity:    
     def __init__(self,entity_type:str, config_elem: object,_id:int=0):
         self.entity_type = entity_type
+        self._id = _id
+        if config_elem.get("_id") == "idle":
+            self.entity_type += "_idle"
+        elif config_elem.get("_id") == "interactive":
+            self.entity_type += "_interactive"
+        else: raise ValueError(f"Invalid object type: {self.entity_type}")
+        logging.info(f"Object {self.entity_type} id {self._id} intialized")
+    
+    def get_name(self):
+        return self.entity_type+"_"+str(self._id)
+
+    def reset(self):
+        pass
+
 class ThdEntity(threading.Thread):    
     def __init__(self,entity_type:str, config_elem: object,_id:int=0):
         super().__init__()
         self.entity_type = entity_type
         self._id = _id
         logging.info(f"Agent {self.entity_type} id {self._id} intialized")
+
+    def get_name(self):
+        return self.entity_type+"_"+str(self._id)
+
+    def reset(self):
+        pass
 
 class StaticObjectEntity(Entity):
     def __init__(self,entity_type:str, config_elem:dict,_id:int=0):
@@ -32,7 +52,6 @@ class StaticObjectEntity(Entity):
 class MovableObjectEntity(Entity):
     def __init__(self,entity_type:str, config_elem:dict,_id:int=0):
         super().__init__(entity_type,config_elem,_id)
-
 
 class StaticAgentEntity(ThdEntity):
     def __init__(self,entity_type:str, config_elem:dict,_id:int=0):

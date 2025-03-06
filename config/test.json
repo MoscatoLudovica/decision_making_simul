@@ -27,7 +27,15 @@
         },
         "objects":{
             "static_0":{
-                "_id": "obstacle",
+                "_id": "idle",
+                "number": [1],
+                "shape": "cube",
+                "side": 1,
+                "pose":[[1,0,0],[0,1,0],[0,0,1]],
+                "color": "red"
+            },
+            "static_1":{
+                "_id": "interactive",
                 "number": [1],
                 "shape": "cube",
                 "side": 1,
