@@ -2,6 +2,7 @@ import logging, gc
 from config import Config
 from arena import ArenaFactory
 from gui import GuiFactory
+import multiprocessing
 
 class EnvironmentFactory():
 
@@ -33,30 +34,71 @@ class SingleProcessEnvironment(Environment):
     def __init__(self,config_elem:Config):
         super().__init__(config_elem)
         logging.info("Single process environment created successfully")
-    
+
+    def run_arena(self, exp, queue):
+        """Function to run the arena in a separate process"""
+        arena = ArenaFactory.create_arena(exp)
+        if self.num_runs > 1 and arena.get_seed() < 0:
+            arena.reset_seed()
+        arena.initialize()
+
+        for run in range(1, self.num_runs + 1):
+            logging.info(f"Run number {run} started")
+            for t in range(self.time_limit):
+                arena.run()
+                # Collect data from the arena
+                data = {
+                    "time": t,
+                    "robot_positions": arena.get_robot_positions(),  # Example function
+                    "robot_angles": arena.get_robot_angles(),  # Example function
+                    "object_positions": arena.get_object_positions(),  # Example function
+                    "object_angles": arena.get_object_angles(),  # Example function
+                }
+
+                # Send data to GUI
+                queue.put(data)
+            arena.increment_seed()
+            if run < self.num_runs:
+                arena.reset()
+        gc.collect()
+        logging.info("Arena process completed")
+
+    def run_gui(self, config, queue):
+        """Function to run the GUI in a separate process"""
+        app,gui = GuiFactory.create_gui(config,queue)
+        gui.show()
+        app.exec()
+        # gui.run()  # Assuming GUI has a run method to start its event loop
+
     def start(self):
         self.arena_shape="none"
         for exp in self.experiments:
-            self.arena = ArenaFactory.create_arena(exp)
-            new_arena_shape = self.arena.get_id()
-            if self.render[0] and self.arena_shape != new_arena_shape:
-                self.arena_shape = new_arena_shape
-                self.render[2] = True
-            if self.render[2] and self.render[0]:
-                self.render[1]["_id"] = "abstract" if self.arena_shape in (None,"none") else self.gui_id
-                self.gui = GuiFactory.create_gui(self.render[1])
-                self.render[2] = False
-            if self.num_runs > 1 and self.arena.get_seed() < 0: self.arena.reset_seed()
-            self.arena.initialize()
-            for run in range(1,self.num_runs + 1):
-                logging.info(f"Run number {run} started")
-                for _ in range(self.time_limit):
-                    self.arena.run()
-                self.arena.increment_seed()
-                if run < self.num_runs: self.arena.reset()
-            gc.collect()
+            # Create and start the arena process
+            queue = multiprocessing.Queue()
+            arena_process = multiprocessing.Process(target=self.run_arena, args=(exp,queue))
+            arena_process.start()
+
+            # Initialize GUI only if rendering is enabled
+            if self.render[0]:
+                new_arena_shape = exp.arena.get("_id")
+                if self.arena_shape != new_arena_shape:
+                    self.arena_shape = new_arena_shape
+                    self.render[2] = True
+
+                if self.render[2]:
+                    self.render[1]["_id"] = "abstract" if self.arena_shape in (None, "none") else self.gui_id
+                    gui_process = multiprocessing.Process(target=self.run_gui, args=(self.render[1],queue))
+                    gui_process.start()
+                    self.render[2] = False
+
+                # Wait for both processes to finish
+                arena_process.join()
+                gui_process.join()
+            else:
+                arena_process.join()
+
         logging.info("All experiments completed successfully")
-    
+
 class MultiProcessEnvironment(Environment):
     
     def __init__(self,config_elem:Config):

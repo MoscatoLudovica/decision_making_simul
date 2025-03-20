@@ -54,7 +54,7 @@
                     "color": "red"
                 }
             },
-            "movable_1":{
+            "movable_0":{
                 "ticks_per_second": 30,
                 "number": [5],
                 "body":{

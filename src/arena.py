@@ -4,6 +4,7 @@ from random import Random
 from bodies.shapes2D import Shape2DFactory
 from bodies.shapes3D import Shape3DFactory
 from entity import EntityFactory
+from geometry_utils.vector3D import Vector3D
 
 class ArenaFactory():
 
@@ -77,6 +78,7 @@ class Arena():
         self.elapsed_ticks += 1
 
     def close(self):
+        # terminate threads and destroy entities
         pass
 
 
@@ -85,27 +87,6 @@ class AbstractArena(Arena):
     def __init__(self, config_elem:Config):
         super().__init__(config_elem)
         logging.info("Abstract arena created successfully")
-    
-    def get_id(self):
-        return super().get_id()
-    
-    def get_seed(self):
-        return super().get_seed()
-
-    def increment_seed(self):
-        super().increment_seed()
-        
-    def reset_seed(self):
-        super().reset_seed()
-        
-    def set_random_seed(self):
-        super().set_random_seed()
-
-    def initialize(self):
-        super().initialize()
-    
-    def run(self):
-        super().run()
     
     def update(self):
         super().update()
@@ -117,29 +98,91 @@ class SolidArena(Arena):
     
     def __init__(self, config_elem:Config):
         super().__init__(config_elem)
-    
-    def get_id(self):
-        return super().get_id()
-    
-    def get_seed(self):
-        return super().get_seed()
 
-    def increment_seed(self):
-        super().increment_seed()
-        
-    def reset_seed(self):
-        super().reset_seed()
-        
-    def set_random_seed(self):
-        super().set_random_seed()
-
-    def initialize(self):
+    def initialize(self,x_low_bnd:float=0,x_high_bnd:float=1,y_low_bnd:float=0,y_high_bnd:float=1):
         super().initialize()
-        # TODO agents position initialization
-        # TODO objects position initialization
+        for (config,entities) in self.agents.values():
+            for n in range(len(entities)):
+                rand_angle = Random.uniform(self.random_generator,a=0,b=360)
+                rand_pos = Vector3D(Random.uniform(self.random_generator,x_low_bnd,x_high_bnd),Random.uniform(self.random_generator,y_low_bnd,y_high_bnd),0) 
+                entities[n].set_angle(rand_angle)
+                entities[n].set_start_position(rand_pos)
+                count = 0
+                done = True
+                while not done and count+1 <= 200:
+                    done = True
+                    for m in range(len(entities)):
+                        if m!=n and rand_pos == entities[m].get_position(): # check_overlap(args)
+                            done = False
+                            rand_pos = Vector3D(Random.uniform(self.random_generator,x_low_bnd,x_high_bnd),Random.uniform(self.random_generator,y_low_bnd,y_high_bnd),0) 
+                            entities[n].set_start_position(rand_pos)
+                            break
 
-    def run(self):
-        super().run()
+        for (config,entities) in self.objects.values():
+            for n in range(len(entities)):
+                rand_angle = Random.uniform(self.random_generator,a=0,b=360)
+                rand_pos = Vector3D(Random.uniform(self.random_generator,x_low_bnd,x_high_bnd),Random.uniform(self.random_generator,y_low_bnd,y_high_bnd),0) 
+                entities[n].set_angle(rand_angle)
+                entities[n].set_start_position(rand_pos)
+                count = 0
+                done = True
+                while not done and count+1 <= 200:
+                    done = True
+                    for m in range(len(entities)):
+                        if entities[n].get_shape() == "dense" and entities[m].get_shape()=="dense" and m!=n and rand_pos == entities[m].get_position():
+                            done = False
+                            rand_pos = Vector3D(Random.uniform(self.random_generator,x_low_bnd,x_high_bnd),Random.uniform(self.random_generator,y_low_bnd,y_high_bnd),0) 
+                            entities[n].set_start_position(rand_pos)
+                            break
+                        if entities[n].get_shape() == "flat" and entities[m].get_shape()=="flat" and m!=n and rand_pos == entities[m].get_position():
+                            done = False
+                            rand_pos = Vector3D(Random.uniform(self.random_generator,x_low_bnd,x_high_bnd),Random.uniform(self.random_generator,y_low_bnd,y_high_bnd),0) 
+                            entities[n].set_start_position(rand_pos)
+                            break
+                    if entities[n].get_shape() == "dense" and done:
+                        for (aconfig,aentities) in self.agents.values():
+                            for an in range(len(aentities)):
+                                if rand_pos == aentities[an].get_position():
+                                    done = False
+                                    rand_pos = Vector3D(Random.uniform(self.random_generator,x_low_bnd,x_high_bnd),Random.uniform(self.random_generator,y_low_bnd,y_high_bnd),0) 
+                                    entities[n].set_start_position(rand_pos)
+                                    break
+
+    def get_robot_positions(self):
+        positions = {}
+        for _,entities in self.agents.values():
+            temp = []
+            for n in range(len(entities)):
+                temp.append(entities[n].get_position())
+            positions.update({entities[0].entity():temp})
+        return positions
+    
+    def get_robot_angles(self):
+        angles = {}
+        for _,entities in self.agents.values():
+            temp = []
+            for n in range(len(entities)):
+                temp.append(entities[n].get_angle())
+            angles.update({entities[0].entity():temp})
+        return angles
+    
+    def get_object_positions(self):
+        positions = {}
+        for _,entities in self.objects.values():
+            temp = []
+            for n in range(len(entities)):
+                temp.append(entities[n].get_position())
+            positions.update({entities[0].entity():temp})
+        return positions
+    
+    def get_object_angles(self):
+        angles = {}
+        for _,entities in self.objects.values():
+            temp = []
+            for n in range(len(entities)):
+                temp.append(entities[n].get_angle())
+            angles.update({entities[0].entity():temp})
+        return angles
     
     def update(self):
         super().update()
@@ -156,32 +199,6 @@ class CircularArena(SolidArena):
         self.color = config_elem.arena.get("color", "white")
         logging.info("Circular arena created successfully")
     
-    def get_id(self):
-        return super().get_id()
-    
-    def get_seed(self):
-        return super().get_seed()
-
-    def increment_seed(self):
-        super().increment_seed()
-        
-    def reset_seed(self):
-        super().reset_seed()
-        
-    def set_random_seed(self):
-        super().set_random_seed()
-
-    def initialize(self):
-        super().initialize()
-    
-    def run(self):
-        super().run()
-    
-    def update(self):
-        super().update()
-    
-    def close(self):
-        super().close()
 
 class RectangularArena(SolidArena):
     
@@ -193,33 +210,6 @@ class RectangularArena(SolidArena):
         self.color = config_elem.arena.get("color", "white")
         logging.info("Rectangular arena created successfully")
     
-    def get_id(self):
-        return super().get_id()
-    
-    def get_seed(self):
-        return super().get_seed()
-
-    def increment_seed(self):
-        super().increment_seed()
-        
-    def reset_seed(self):
-        super().reset_seed()
-        
-    def set_random_seed(self):
-        super().set_random_seed()
-
-    def initialize(self):
-        super().initialize()
-    
-    def run(self):
-        super().run()
-    
-    def update(self):
-        super().update()
-    
-    def close(self):
-        super().close()
-
 class SquareArena(SolidArena):
     
     def __init__(self, config_elem:Config):
@@ -229,29 +219,3 @@ class SquareArena(SolidArena):
         self.color = config_elem.arena.get("color", "white")
         logging.info("Square arena created successfully")
     
-    def get_id(self):
-        return super().get_id()
-    
-    def get_seed(self):
-        return super().get_seed()
-
-    def increment_seed(self):
-        super().increment_seed()
-        
-    def reset_seed(self):
-        super().reset_seed()
-        
-    def set_random_seed(self):
-        super().set_random_seed()
-
-    def initialize(self):
-        super().initialize()
-    
-    def run(self):
-        super().run()
-    
-    def update(self):
-        super().update()
-    
-    def close(self):
-        super().close()
