@@ -1,28 +1,29 @@
-import logging, gc
+import logging, gc, time
 from config import Config
 from arena import ArenaFactory
 from gui import GuiFactory
 import multiprocessing
+import psutil
 
 class EnvironmentFactory():
 
     @staticmethod
     def create_environment(config_elem:Config):
-        if not config_elem.environment["multi_processing"] or config_elem.gui["render"]:
+        if not config_elem.environment["multi_processing"] or config_elem.environment["render"]:
             return SingleProcessEnvironment(config_elem)
-        elif config_elem.environment["multi_processing"] and not config_elem.gui["render"]:
+        elif config_elem.environment["multi_processing"] and not config_elem.environment["render"]:
             return MultiProcessEnvironment(config_elem)
         else:
-            raise ValueError(f"Invalid environment configuration: {config_elem.environment['multi_processing']} {config_elem.gui['render']}")
+            raise ValueError(f"Invalid environment configuration: {config_elem.environment['multi_processing']} {config_elem.environment['render']}")
         
 class Environment():
     
     def __init__(self,config_elem:Config):
         self.experiments = config_elem.parse_experiments()
-        self.num_runs = int(config_elem.environment.get("num_runs"))
-        self.time_limit = int(config_elem.environment.get("time_limit"))
+        self.num_runs = int(config_elem.environment.get("num_runs",1))
+        self.time_limit = int(config_elem.environment.get("time_limit",0))
         self.gui_id = config_elem.gui.get("_id","2D")
-        self.render = [config_elem.environment.get("render",False),config_elem.gui,True and config_elem.environment.get("render",False)]
+        self.render = [config_elem.environment.get("render",False),config_elem.gui]
         self.gui = None
         self.arena = None
 
@@ -35,66 +36,84 @@ class SingleProcessEnvironment(Environment):
         super().__init__(config_elem)
         logging.info("Single process environment created successfully")
 
-    def run_arena(self, exp, queue):
+    def run_arena(self, exp, queue = None):
         """Function to run the arena in a separate process"""
         arena = ArenaFactory.create_arena(exp)
         if self.num_runs > 1 and arena.get_seed() < 0:
             arena.reset_seed()
         arena.initialize()
-
         for run in range(1, self.num_runs + 1):
             logging.info(f"Run number {run} started")
-            for t in range(self.time_limit):
+            t = 0
+            data = {
+                "time": t,
+                "arena_vertices": arena.get_shape().vertices(),
+                "robot_shapes": arena.get_robot_shapes(),
+                "object_shapes": arena.get_object_shapes(),
+            }
+            # Send data to GUI
+            if queue != None:
+                queue.put(data)
+            while True:
+                t += 1
                 arena.run()
                 # Collect data from the arena
                 data = {
                     "time": t,
-                    "robot_positions": arena.get_robot_positions(),  # Example function
-                    "robot_angles": arena.get_robot_angles(),  # Example function
-                    "object_positions": arena.get_object_positions(),  # Example function
-                    "object_angles": arena.get_object_angles(),  # Example function
+                    "arena_vertices": arena.get_shape().vertices(),
+                    "robot_shapes": arena.get_robot_shapes(),
+                    "object_shapes": arena.get_object_shapes(),
                 }
-
                 # Send data to GUI
-                queue.put(data)
+                if queue != None:
+                    queue.put(data)
+                if self.time_limit > 0 and t >= self.time_limit: break
             arena.increment_seed()
             if run < self.num_runs:
+                if queue != None:
+                    time.sleep(1)
                 arena.reset()
+            else: arena.close()
         gc.collect()
-        logging.info("Arena process completed")
 
     def run_gui(self, config, queue):
         """Function to run the GUI in a separate process"""
         app,gui = GuiFactory.create_gui(config,queue)
         gui.show()
         app.exec()
-        # gui.run()  # Assuming GUI has a run method to start its event loop
 
     def start(self):
         self.arena_shape="none"
         for exp in self.experiments:
-            # Create and start the arena process
-            queue = multiprocessing.Queue()
-            arena_process = multiprocessing.Process(target=self.run_arena, args=(exp,queue))
-            arena_process.start()
-
             # Initialize GUI only if rendering is enabled
             if self.render[0]:
-                new_arena_shape = exp.arena.get("_id")
-                if self.arena_shape != new_arena_shape:
-                    self.arena_shape = new_arena_shape
-                    self.render[2] = True
+                self.arena_shape = exp.arena.get("_id")
+                self.render[1]["_id"] = "abstract" if self.arena_shape in (None, "none") else self.gui_id
+                queue = multiprocessing.Queue()
+                arena_process = multiprocessing.Process(target=self.run_arena, args=(exp,queue))
+                gui_process = multiprocessing.Process(target=self.run_gui, args=(self.render[1],queue))
+                gui_process.start()
+                time.sleep(0.5)
+                arena_process.start()
+                time.sleep(0.5)
+                killed = 0
+                while queue.qsize()>0:
+                    if psutil.Process(gui_process.pid).status() == psutil.STATUS_ZOMBIE:
+                        killed = 1
+                        gui_process.terminate()
+                        gui_process.join()
+                        arena_process.terminate()
+                        arena_process.join()
+                        break
+                if killed == 0:
+                    arena_process.join()
+                    gui_process.terminate()
+                    gui_process.join()
 
-                if self.render[2]:
-                    self.render[1]["_id"] = "abstract" if self.arena_shape in (None, "none") else self.gui_id
-                    gui_process = multiprocessing.Process(target=self.run_gui, args=(self.render[1],queue))
-                    gui_process.start()
-                    self.render[2] = False
-
-                # Wait for both processes to finish
-                arena_process.join()
-                gui_process.join()
             else:
+                # Create and start the arena process
+                arena_process = multiprocessing.Process(target=self.run_arena, args=(exp,))
+                arena_process.start()
                 arena_process.join()
 
         logging.info("All experiments completed successfully")

@@ -1,36 +1,30 @@
 import math
+import numpy as np
 from geometry_utils.vector3D import Vector3D
 
 class Shape3DFactory:
     @staticmethod
-    def create_shape(shape_type:str,config_elem:dict):
+    def create_shape(_object:str,shape_type:str, config_elem:dict):
         if shape_type == "sphere":
-            return Sphere(config_elem)
-        elif shape_type == "cube":
-            return Cube(config_elem)
-        elif shape_type == "cuboid":
-            return Cuboid(config_elem)
-        elif shape_type == "pyramid":
-            return Pyramid(config_elem)
-        elif shape_type == "cone":
-            return Cone(config_elem)
-        elif shape_type == "cylinder":
-            return Cylinder(config_elem)
+            return Sphere(_object,config_elem)
+        elif shape_type in ("square","cube"):
+            return Cube(_object,config_elem)
+        elif shape_type in ("rectangle","cuboid"):
+            return Cuboid(_object,config_elem)
+        elif shape_type in ("circle","cylinder"):
+            return Cylinder(_object,config_elem)
         elif shape_type == "point" or shape_type == "none":
-            return Shape(config_elem)
+            return Shape(_object,config_elem)
         else:
             raise ValueError(f"Unknown shape type: {shape_type}")
-        
+
 class Shape:
-
-    def __init__(self,config_elem:dict,center: Vector3D = Vector3D()):
-        self.center = center
-        if config_elem != None:
-            self.height = config_elem.get("height", 0.01)
-            self.color = config_elem.get("color", "white")
-
-    def configure(self):
-        pass
+    def __init__(self, config_elem:dict, center: Vector3D = Vector3D()):
+        self.center = Vector3D(np.round(center.x,3),np.round(center.y,3),np.round(center.z,3))
+        self.floor = 0.0   # special entry used only for arena
+        self._object = "arena"
+        self.color = config_elem.get("color", "white")
+        self.vertices_list = []
 
     def volume(self) -> float:
         pass
@@ -45,8 +39,7 @@ class Shape:
         pass
 
     def translate(self, translation_vector):
-        self.center = self.center + translation_vector
-        self.set_vertices()
+        pass
 
     def scale(self, scale_factor):
         pass
@@ -54,34 +47,109 @@ class Shape:
     def set_vertices(self):
         pass
 
-    def rotate_x(self, angle:float):
+    def check_overlap(self, _shape):
         for vertex in self.vertices():
-            rotated_vertex = vertex.v_rotate_x(self.center,angle)
+            if _shape._object == "arena":
+                if self._is_point_outside_shape(vertex, _shape):
+                    return True
+            else:
+                if self._is_point_inside_shape(vertex, _shape):
+                    return True
+        for vertex in _shape.vertices():
+            if self._is_point_inside_shape(vertex, self):
+                return True
+        return False
+
+    def _is_point_inside_shape(self, point, shape):
+        # This is a placeholder method. The actual implementation will depend on the specific shape.
+        # For simplicity, let's assume it checks if a point is inside a bounding box of the shape.
+        min_x = min(vertex.x for vertex in shape.vertices())
+        max_x = max(vertex.x for vertex in shape.vertices())
+        min_y = min(vertex.y for vertex in shape.vertices())
+        max_y = max(vertex.y for vertex in shape.vertices())
+        min_z = min(vertex.z for vertex in shape.vertices())
+        max_z = max(vertex.z for vertex in shape.vertices())
+
+        return (min_x <= point.x <= max_x and
+                min_y <= point.y <= max_y and
+                min_z <= point.z <= max_z)
+    
+    def _is_point_outside_shape(self, point, shape):
+        # This is a placeholder method. The actual implementation will depend on the specific shape.
+        # For simplicity, let's assume it checks if a point is inside a bounding box of the shape.
+        min_x = min(vertex.x for vertex in shape.vertices())
+        max_x = max(vertex.x for vertex in shape.vertices())
+        min_y = min(vertex.y for vertex in shape.vertices())
+        max_y = max(vertex.y for vertex in shape.vertices())
+        min_z = min(vertex.z for vertex in shape.vertices())
+        max_z = max(vertex.z for vertex in shape.vertices())
+
+        return (not (min_x <= point.x <= max_x) or
+                not (min_y <= point.y <= max_y) or
+                not (min_z <= point.z <= max_z))
+
+    def rotate_x(self, angle:float):
+        angle_rad = math.radians(angle)
+        for vertex in self.vertices():
+            rotated_vertex = vertex.v_rotate_x(self.center, angle_rad)
             new_vertex = rotated_vertex + self.center
             vertex.x, vertex.y, vertex.z = new_vertex.x, new_vertex.y, new_vertex.z
 
     def rotate_y(self, angle:float):
+        angle_rad = math.radians(angle)
         for vertex in self.vertices():
-            rotated_vertex = vertex.v_rotate_y(self.center,angle)
+            rotated_vertex = vertex.v_rotate_y(self.center, angle_rad)
             new_vertex = rotated_vertex + self.center
             vertex.x, vertex.y, vertex.z = new_vertex.x, new_vertex.y, new_vertex.z
 
     def rotate_z(self, angle:float):
+        angle_rad = math.radians(angle)
         for vertex in self.vertices():
-            rotated_vertex = vertex.v_rotate_z(self.center,angle)
+            rotated_vertex = vertex.v_rotate_z(self.center, angle_rad)
             new_vertex = rotated_vertex + self.center
             vertex.x, vertex.y, vertex.z = new_vertex.x, new_vertex.y, new_vertex.z
 
+    def min_vert_x(self):
+        out = 99999
+        for v in self.vertices_list:
+            if v.x < out: out = v.x
+        return out
+
+    def max_vert_x(self):
+        out = -1
+        for v in self.vertices_list:
+            if v.x > out: out = v.x
+        return out
+    
+    def min_vert_y(self):
+        out = 99999
+        for v in self.vertices_list:
+            if v.y < out: out = v.y
+        return out
+
+    def max_vert_y(self):
+        out = -1
+        for v in self.vertices_list:
+            if v.y > out: out = v.y
+        return out
+    
+    def min_vert_z(self):
+        out = 99999
+        for v in self.vertices_list:
+            if v.z < out: out = v.z
+        return out
+
+    def max_vert_z(self):
+        out = -1
+        for v in self.vertices_list:
+            if v.z > out: out = v.z
+        return out
+
 class Sphere(Shape):
-
-    def __init__(self, radius:float, config_elem:dict):
-        super().__init__(config_elem=config_elem)
-        self.radius = radius
-        self.vertices_list = []
-
-    def configure(self, radius:float, new_center:Vector3D):
-        super().__init__(config_elem=None,center=new_center)
-        self.radius = radius
+    def __init__(self,_object, config_elem:dict, center: Vector3D = Vector3D()):
+        super().__init__(config_elem=config_elem, center=center)
+        self._object = _object
+        self.radius = config_elem.get("radius", 1.0)
 
     def volume(self):
         return (4/3) * math.pi * self.radius ** 3
@@ -94,20 +162,28 @@ class Sphere(Shape):
 
     def vertices(self):
         return self.vertices_list
+    
+    def translate(self, translation_vector):
+        self.center = self.center + translation_vector
+        self.set_vertices()
 
     def set_vertices(self):
         self.vertices_list = []
+        num_vertices = 260
+        for i in range(num_vertices):
+            theta = 2 * math.pi * (i / num_vertices)
+            for j in range(num_vertices):
+                phi = math.pi * j / num_vertices
+                x = self.center.x + self.radius * math.sin(phi) * math.cos(theta)
+                y = self.center.y + self.radius * math.sin(phi) * math.sin(theta)
+                z = self.center.z + self.radius * math.cos(phi)
+                self.vertices_list.append(Vector3D(np.round(x,3), np.round(y,3), np.round(z,3)))
 
 class Cube(Shape):
-
-    def __init__(self, side_length:float, config_elem:dict):
-        super().__init__(config_elem=config_elem)
-        self.side_length = side_length
-        self.set_vertices()
-
-    def configure(self, side_length:float, new_center:Vector3D):
-        super().__init__(config_elem=None,center=new_center)
-        self.side_length = side_length
+    def __init__(self,_object, config_elem:dict, center: Vector3D = Vector3D()):
+        super().__init__(config_elem=config_elem, center=center)
+        self._object = _object
+        self.side_length = config_elem.get("side", 1.0)
         self.set_vertices()
 
     def volume(self):
@@ -122,33 +198,37 @@ class Cube(Shape):
     def vertices(self):
         return self.vertices_list
 
-    def set_vertices(self):
-        half_side = self.side_length * .5
-        cx, cy, cz = self.center.x, self.center.y, self.center.z
-        self.vertices_list = [
-            Vector3D(cx - half_side, cy - half_side, cz - half_side),
-            Vector3D(cx + half_side, cy - half_side, cz - half_side),
-            Vector3D(cx + half_side, cy + half_side, cz - half_side),
-            Vector3D(cx - half_side, cy + half_side, cz - half_side),
-            Vector3D(cx - half_side, cy - half_side, cz + half_side),
-            Vector3D(cx + half_side, cy - half_side, cz + half_side),
-            Vector3D(cx + half_side, cy + half_side, cz + half_side),
-            Vector3D(cx - half_side, cy + half_side, cz + half_side)
-        ]
-
-class Cuboid(Shape):
-    def __init__(self, width:float, height:float, depth:float, config_elem):
-        super().__init__(config_elem)
-        self.width = width
-        self.height = height
-        self.depth = depth
+    def translate(self, translation_vector):
+        self.center = self.center + translation_vector
         self.set_vertices()
 
-    def configure(self, width:float, height:float, depth:float, new_center:Vector3D):
-        super().__init__(config_elem=None,center=new_center)
-        self.width = width
-        self.height = height
-        self.depth = depth
+    def set_vertices(self):
+        half_side = self.side_length * 0.5
+        cx, cy, cz = self.center.x, self.center.y, self.center.z
+        self.vertices_list = [
+            Vector3D(np.round(cx - half_side,3), np.round(cy - half_side,3), np.round(cz - half_side,3)),
+            Vector3D(np.round(cx + half_side,3), np.round(cy - half_side,3), np.round(cz - half_side,3)),
+            Vector3D(np.round(cx + half_side,3), np.round(cy + half_side,3), np.round(cz - half_side,3)),
+            Vector3D(np.round(cx - half_side,3), np.round(cy + half_side,3), np.round(cz - half_side,3)),
+            Vector3D(np.round(cx - half_side,3), np.round(cy - half_side,3), np.round(cz + half_side,3)),
+            Vector3D(np.round(cx + half_side,3), np.round(cy - half_side,3), np.round(cz + half_side,3)),
+            Vector3D(np.round(cx + half_side,3), np.round(cy + half_side,3), np.round(cz + half_side,3)),
+            Vector3D(np.round(cx - half_side,3), np.round(cy + half_side,3), np.round(cz + half_side,3))
+        ]
+        if self._object == "arena":
+            self.floor = self.min_vert_z()
+        else:
+            
+        print(self._object,self.vertices_list)
+        print(self.center,self.min_vert_z())
+
+class Cuboid(Shape):
+    def __init__(self,_object, config_elem:dict, center: Vector3D = Vector3D()):
+        super().__init__(config_elem=config_elem, center=center)
+        self._object = _object
+        self.width = config_elem.get("width", 1.0)
+        self.height = config_elem.get("height", 1.0)
+        self.depth = config_elem.get("depth", 1.0)
         self.set_vertices()
 
     def volume(self):
@@ -163,104 +243,35 @@ class Cuboid(Shape):
     def vertices(self):
         return self.vertices_list
 
-    def set_vertices(self):
-        half_width = self.width * .5
-        half_height = self.height * .5
-        half_depth = self.depth * .5
-        cx, cy, cz = self.center.x, self.center.y, self.center.z
-        self.vertices_list = [
-            Vector3D(cx - half_width, cy - half_height, cz - half_depth),
-            Vector3D(cx + half_width, cy - half_height, cz - half_depth),
-            Vector3D(cx + half_width, cy + half_height, cz - half_depth),
-            Vector3D(cx - half_width, cy + half_height, cz - half_depth),
-            Vector3D(cx - half_width, cy - half_height, cz + half_depth),
-            Vector3D(cx + half_width, cy - half_height, cz + half_depth),
-            Vector3D(cx + half_width, cy + half_height, cz + half_depth),
-            Vector3D(cx - half_width, cy + half_height, cz + half_depth)
-        ]
-
-class Pyramid(Shape):
-    def __init__(self, base_length:float, base_width:float, height:float, config_elem:dict):
-        super().__init__(config_elem)
-        self.base_length = base_length
-        self.base_width = base_width
-        self.height = height
+    def translate(self, translation_vector):
+        self.center = self.center + translation_vector
         self.set_vertices()
 
-    def configure(self, base_length:float, base_width:float, height:float, new_center:Vector3D):            
-        super().__init__(config_elem=None, center=new_center)
-        self.base_length = base_length
-        self.base_width = base_width
-        self.height = height
-        self.set_vertices()
-
-    def volume(self):
-        return (1/3) * self.base_length * self.base_width * self.height
-
-    def surface_area(self):
-        base_area = self.base_length * self.base_width
-        slant_height1 = math.sqrt((self.base_length * .5) ** 2 + self.height ** 2)
-        slant_height2 = math.sqrt((self.base_width * .5) ** 2 + self.height ** 2)
-        lateral_area = self.base_length * slant_height1 + self.base_width * slant_height2
-        return base_area + lateral_area
-
-    def center_of_mass(self):
-        return Vector3D(self.center.x, self.center.y, self.center.z + self.height * .25)
-
-    def vertices(self):
-        return self.vertices_list
-
     def set_vertices(self):
-        half_length = self.base_length * .5
-        half_width = self.base_width * .5
+        half_width = self.width * 0.5
+        half_height = self.height * 0.5
+        half_depth = self.depth * 0.5
         cx, cy, cz = self.center.x, self.center.y, self.center.z
         self.vertices_list = [
-            Vector3D(cx - half_length, cy - half_width, cz),
-            Vector3D(cx + half_length, cy - half_width, cz),
-            Vector3D(cx + half_length, cy + half_width, cz),
-            Vector3D(cx - half_length, cy + half_width, cz),
-            Vector3D(cx, cy, cz + self.height)
+            Vector3D(np.round(cx - half_width,3), np.round(cy - half_depth,3), np.round(cz - half_height,3)),
+            Vector3D(np.round(cx + half_width,3), np.round(cy - half_depth,3), np.round(cz - half_height,3)),
+            Vector3D(np.round(cx + half_width,3), np.round(cy + half_depth,3), np.round(cz - half_height,3)),
+            Vector3D(np.round(cx - half_width,3), np.round(cy + half_depth,3), np.round(cz - half_height,3)),
+            Vector3D(np.round(cx - half_width,3), np.round(cy - half_depth,3), np.round(cz + half_height,3)),
+            Vector3D(np.round(cx + half_width,3), np.round(cy - half_depth,3), np.round(cz + half_height,3)),
+            Vector3D(np.round(cx + half_width,3), np.round(cy + half_depth,3), np.round(cz + half_height,3)),
+            Vector3D(np.round(cx - half_width,3), np.round(cy + half_depth,3), np.round(cz + half_height,3))
         ]
-
-class Cone(Shape):
-    def __init__(self, radius:float, height:float, config_elem:dict):
-        super().__init__(config_elem)
-        self.radius = radius
-        self.height = height
-        self.vertices_list = []
-
-    def configure(self, radius:float, height:float, new_center:Vector3D):
-        super().__init__(config_elem=None,center=new_center)
-        self.radius = radius
-        self.height = height
-
-    def volume(self):
-        return (1/3) * math.pi * self.radius ** 3
-
-    def surface_area(self):
-        slant_height = math.sqrt(self.radius ** 2 + self.height ** 2)
-        return math.pi * self.radius * (self.radius + slant_height)
-
-    def center_of_mass(self):
-        return Vector3D(self.center.x, self.center.y, self.center.z + self.height * .25)
-
-    def vertices(self):
-        return self.vertices_list
-
-    def set_vertices(self):
-        self.vertices_list = []
+        if self._object == "arena":
+            self.floor = self.min_vert_z()
 
 class Cylinder(Shape):
-    def __init__(self, radius:float, height:float, config_elem):
-        super().__init__(config_elem)
-        self.radius = radius
-        self.height = height
-        self.vertices_list = []
-    
-    def configure(self, radius:float, height:float, new_center:Vector3D):
-        super().__init__(config_elem=None,center=new_center)
-        self.radius = radius
-        self.height = height
+    def __init__(self,_object:str, config_elem:dict, center: Vector3D = Vector3D()):
+        super().__init__(config_elem=config_elem, center=center)
+        self._object = _object
+        self.radius = config_elem.get("radius", 1.0)
+        self.height = config_elem.get("height", 1.0)
+        self.set_vertices()
 
     def volume(self):
         return math.pi * self.radius ** 2 * self.height
@@ -269,10 +280,28 @@ class Cylinder(Shape):
         return 2 * math.pi * self.radius * (self.radius + self.height)
 
     def center_of_mass(self):
-        return Vector3D(self.center.x, self.center.y, self.center.z + self.height * .5)
+        return Vector3D(self.center.x, self.center.y, self.center.z + self.height * 0.5)
 
     def vertices(self):
         return self.vertices_list
 
+    def translate(self, translation_vector):
+        self.center = self.center + translation_vector
+        self.set_vertices()
+
     def set_vertices(self):
         self.vertices_list = []
+        num_vertices = 120
+        angle_increment = 2 * math.pi / num_vertices
+        for i in range(num_vertices):
+            angle = i * angle_increment
+            x = self.center.x + self.radius * math.cos(angle)
+            y = self.center.y + self.radius * math.sin(angle)
+            z1 = self.center.z - self.height * 0.5
+            z2 = self.center.z + self.height * 0.5
+            self.vertices_list.append(Vector3D(np.round(x,3), np.round(y,3), np.round(z1,3)))
+            self.vertices_list.append(Vector3D(np.round(x,3), np.round(y,3), np.round(z2,3)))
+        if self._object == "arena":
+            self.floor = self.min_vert_z()
+        print(self._object,len(self.vertices_list))
+        print(self.center,self.min_vert_z())

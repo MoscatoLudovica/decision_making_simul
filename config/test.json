@@ -1,8 +1,8 @@
 {
     "environment":{
         "multi_processing": false,
-        "time_limit": 100,
-        "num_runs": 1,
+        "time_limit": 20,
+        "num_runs": 2,
         "render": true,
         "results":{
             "_id": "basic",
@@ -19,7 +19,6 @@
         "arenas":{
             "arena_0":{
                 "random_seed": -1,
-                "ticks_per_second": 10,
                 "_id": "square",
                 "side": 1,
                 "color": "white"
@@ -27,42 +26,25 @@
         },
         "objects":{
             "static_0":{
-                "_id": "idle",
-                "number": [1],
-                "shape": "cube",
-                "side": 1,
-                "pose":[[1,0,0],[0,1,0],[0,0,1]],
-                "color": "red"
-            },
-            "static_1":{
                 "_id": "interactive",
                 "number": [1],
-                "shape": "cube",
-                "side": 1,
-                "pose":[[1,0,0],[0,1,0],[0,0,1]],
+                "shape": "circle",
+                "radius": 0.01,
+                "position":[[0,0,0]],
+                "orientation":[[0,0,0]],
                 "color": "red"
             }
         },
         "agents":{
-            "static_0":{
-                "ticks_per_second": 60,
-                "number": [1],
-                "body":{
-                    "_id": "cylinder",
-                    "height": 0.3,
-                    "radius": 0.03,
-                    "color": "red"
-                }
-            },
             "movable_0":{
-                "ticks_per_second": 30,
-                "number": [5],
-                "body":{
-                    "_id": "cylinder",
-                    "height": 0.02,
-                    "radius": 0.033,
-                    "color": "blue"
-                }
+                "ticks_per_second": 31,
+                "number": [1],
+                "position":[[0,0,0]],
+                "orientation":[[0,0,180]],
+                "shape": "cylinder",
+                "height": 0.02,
+                "radius": 0.033,
+                "color": "blue"
             }
         }   
     }

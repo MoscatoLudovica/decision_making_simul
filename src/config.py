@@ -49,10 +49,8 @@ class Config:
         # Check required fields in agents
         num_experiments = None
         for agent in agents.values():
-            if 'ticks_per_second' not in agent or 'number' not in agent or 'body' not in agent:
-                raise ValueError("Each agent must have 'ticks_per_second', 'number', and 'body' fields")
-            if '_id' not in agent['body']:
-                raise ValueError("Each agent's body must have '_id' field")
+            if 'ticks_per_second' not in agent or 'number' not in agent:
+                raise ValueError("Each agent must have 'ticks_per_second' and 'number' fields")
             if num_experiments is None:
                 num_experiments = len(agent['number'])
             elif len(agent['number']) != num_experiments:
@@ -66,8 +64,8 @@ class Config:
         # Check required fields in objects
         # Check that all dictionaries in objects have the field 'number' with the same length
         for obj in objects.values():
-            if '_id' not in obj or 'number' not in obj or 'shape' not in obj:
-                raise ValueError("Each object must have '_id', 'number', 'shape' fields")
+            if '_id' not in obj or 'number' not in obj:
+                raise ValueError("Each object must have '_id' and 'number' fields")
             if num_experiments is None:
                 num_experiments = len(obj['number'])
             elif len(obj['number']) != num_experiments:
@@ -75,14 +73,10 @@ class Config:
         
         # Check required fields in arenas
         for arena in arenas.values():
-            required_arena_fields = ["_id", "ticks_per_second"]
+            required_arena_fields = ["_id"]
             for field in required_arena_fields:
                 if field not in arena:
                     raise ValueError(f"The '{field}' field is required in the arena")
-                else:
-                    if field == "ticks_per_second":
-                        if not isinstance(arena[field], int) or arena[field] <= 0:
-                            raise ValueError(f"The '{field}' field must be a positive integer")
                         
         # Check required fields in results
         if 'results' not in environment:
@@ -108,8 +102,8 @@ class Config:
                         raise ValueError(f"The '{field}' field is required in the environment")
                     else:
                         if field == "time_limit":
-                            if not isinstance(environment[field], int) or environment[field] <= 0:
-                                raise ValueError(f"The '{field}' field must be a positive integer")
+                            if not isinstance(environment[field], int) or environment[field] < 0:
+                                raise ValueError(f"The '{field}' field must be a positive integer greater or equal to zero")
                         elif field == "num_runs":
                             if not isinstance(environment[field], int) or environment[field] <= 0:
                                 raise ValueError(f"The '{field}' field must be a positive integer")

@@ -1,7 +1,6 @@
 import logging
 from config import Config
 from random import Random
-from bodies.shapes2D import Shape2DFactory
 from bodies.shapes3D import Shape3DFactory
 from entity import EntityFactory
 from geometry_utils.vector3D import Vector3D
@@ -25,15 +24,19 @@ class Arena():
     
     def __init__(self, config_elem:Config):
         self.random_generator = Random()
-        self.ticks_per_second = config_elem.arena.get("ticks_per_second",10)
         self.random_seed = config_elem.arena.get("random_seed",-1)
         self._id = "none" if config_elem.arena.get("_id") == "abstract" else config_elem.arena.get("_id") 
-        self.shape = Shape2DFactory.create_shape(self._id, {key:val for key,val in config_elem.arena.items()})
+        self.shape = None
+        if self._id != "none":
+            self.shape = Shape3DFactory.create_shape("arena",self._id, {key:val for key,val in config_elem.arena.items()})
         self.agents = {agent_type: (config_elem.environment.get("agents").get(agent_type),[]) for agent_type in config_elem.environment.get("agents").keys()}
         self.objects = {object_type: (config_elem.environment.get("objects").get(object_type),[]) for object_type in config_elem.environment.get("objects").keys()}
     
     def get_id(self):
         return self._id
+    
+    def get_shape(self):
+        return self.shape
     
     def get_seed(self):
         return self.random_seed
@@ -51,7 +54,6 @@ class Arena():
             self.random_generator.seed()
 
     def initialize(self):
-        self.elapsed_ticks = 0
         self.set_random_seed()
         # agents initialization
         for key,(config,entities) in self.agents.items():
@@ -71,14 +73,15 @@ class Arena():
                 entities[n].reset()
 
     def run(self):
-        for _ in range(self.ticks_per_second):
-            self.update()
-
-    def update(self):
-        self.elapsed_ticks += 1
+        pass
 
     def close(self):
-        # terminate threads and destroy entities
+        for (config,entities) in self.agents.values():
+            for n in range(len(entities)):
+                entities[n].close()
+        for (config,entities) in self.objects.values():
+            for n in range(len(entities)):
+                entities[n].close()
         pass
 
 
@@ -88,9 +91,6 @@ class AbstractArena(Arena):
         super().__init__(config_elem)
         logging.info("Abstract arena created successfully")
     
-    def update(self):
-        super().update()
-    
     def close(self):
         super().close()
 
@@ -99,94 +99,214 @@ class SolidArena(Arena):
     def __init__(self, config_elem:Config):
         super().__init__(config_elem)
 
-    def initialize(self,x_low_bnd:float=0,x_high_bnd:float=1,y_low_bnd:float=0,y_high_bnd:float=1):
+    def initialize(self):
         super().initialize()
+        # for (config,entities) in self.agents.values():
+        #     for n in range(len(entities)):
+        #         entities[n].set_position(Vector3D(999,0,0),False)
+        # for (config,entities) in self.objects.values():
+        #     for n in range(len(entities)):
+        #         entities[n].set_position(Vector3D(999,0,0),False)
+        # for (config,entities) in self.agents.values():
+        #     for n in range(len(entities)):
+        #         if entities[n].get_start_orientation() == None:
+        #             rand_angle = Random.uniform(self.random_generator,0,360)
+        #             entities[n].set_start_orientation(Vector3D(0,0,rand_angle))
+        #         if entities[n].get_start_position() == None:
+        #             count = 0
+        #             done = False
+        #             while not done and count < 200:
+        #                 done = True
+        #                 rand_pos = Vector3D(Random.uniform(self.random_generator,self.shape.min_vert_x(),self.shape.max_vert_x()),\
+        #                                     Random.uniform(self.random_generator,self.shape.min_vert_y(),self.shape.max_vert_y()),\
+        #                                     self.shape.floor + abs(entities[n].get_shape().min_vert_z())) 
+        #                 entities[n].set_position(rand_pos)
+        #                 if entities[n].get_shape().check_overlap(self.shape):
+        #                     done = False
+        #                 if done:
+        #                     for m in range(len(entities)):
+        #                         if m!=n and entities[n].get_shape().check_overlap(entities[m].get_shape()):
+        #                             done = False
+        #                             break
+        #                 count += 1
+        #                 if done:
+        #                     entities[n].set_start_position(rand_pos)
+
+        #         else:
+        #             position = entities[n].get_start_position()
+        #             print(position)
+        #             print((entities[n].get_shape().min_vert_z()))
+        #             entities[n].set_start_position(Vector3D(position.x,position.y,position.z + self.shape.floor + (abs(entities[n].get_shape().min_vert_z()))))
+        #             print(entities[n].get_start_position())
+        #             print((entities[n].get_shape().min_vert_z()))
+                
+
+        # for (config,entities) in self.objects.values():
+        #     for n in range(len(entities)):
+        #         if entities[n].get_start_orientation() == None:
+        #             rand_angle = Random.uniform(self.random_generator,0,360)
+        #             entities[n].set_start_orientation(Vector3D(0,0,rand_angle))
+        #         if entities[n].get_start_position() == None:
+        #             count = 0
+        #             done = False
+        #             while not done and count < 500:
+        #                 done = True
+        #                 rand_pos = Vector3D(Random.uniform(self.random_generator,self.shape.min_vert_x(),self.shape.max_vert_x()),\
+        #                             Random.uniform(self.random_generator,self.shape.min_vert_y(),self.shape.max_vert_y()),\
+        #                             self.shape.floor + abs(entities[n].get_shape().min_vert_z())) 
+        #                 entities[n].set_position(rand_pos)
+        #                 if entities[n].get_shape().check_overlap(self.shape):
+        #                     done = False
+        #                 if done:
+        #                     for m in range(len(entities)):
+        #                         if entities[n].get_shape_type() == "dense" and entities[m].get_shape_type()=="dense" and m!=n and entities[n].get_shape().check_overlap(entities[m].get_shape()):
+        #                             done = False
+        #                             break
+        #                         if entities[n].get_shape_type() == "flat" and entities[m].get_shape_type()=="flat" and m!=n and entities[n].get_shape().check_overlap(entities[m].get_shape()):
+        #                             done = False
+        #                             break
+        #                 if done and entities[n].get_shape_type() == "dense":
+        #                     for (aconfig,aentities) in self.agents.values():
+        #                         for an in range(len(aentities)):
+        #                             if entities[n].get_shape().check_overlap(aentities[an].get_shape()):
+        #                                 done = False
+        #                                 break
+        #                 count += 1
+        #                 if done: entities[n].set_start_position(rand_pos)
+        #         else:
+        #             position = entities[n].get_start_position()
+        #             entities[n].set_start_position(Vector3D(position.x,position.y,position.z + self.shape.floor + abs(entities[n].get_shape().min_vert_z())))
+                
+
+    def get_robot_positions(self) -> dict:
+        positions = {}
+        for _,entities in self.agents.values():
+            temp = []
+            for n in range(len(entities)):
+                temp.append(entities[n].get_position())
+            positions.update({entities[0].entity():temp})
+        return positions
+    
+    def get_robot_orientations(self) -> dict:
+        orientations = {}
+        for _,entities in self.agents.values():
+            temp = []
+            for n in range(len(entities)):
+                temp.append(entities[n].get_orientation())
+            orientations.update({entities[0].entity():temp})
+        return orientations
+    
+    def get_robot_shapes(self) -> dict:
+        shapes = {}
+        for _,entities in self.agents.values():
+            temp = []
+            for n in range(len(entities)):
+                temp.append(entities[n].get_shape())
+            shapes.update({entities[0].entity():temp})
+        return shapes
+    
+    def get_object_positions(self) -> dict:
+        positions = {}
+        for _,entities in self.objects.values():
+            temp = []
+            for n in range(len(entities)):
+                temp.append(entities[n].get_position())
+            positions.update({entities[0].entity():temp})
+        return positions
+    
+    def get_object_orientations(self) -> dict:
+        orientations = {}
+        for _,entities in self.objects.values():
+            temp = []
+            for n in range(len(entities)):
+                temp.append(entities[n].get_orientation())
+            orientations.update({entities[0].entity():temp})
+        return orientations
+    
+    def get_object_shapes(self) -> dict:
+        shapes = {}
+        for _,entities in self.objects.values():
+            temp = []
+            for n in range(len(entities)):
+                temp.append(entities[n].get_shape())
+            shapes.update({entities[0].entity():temp})
+        return shapes
+    
+    def run(self):
+        super().run()
+        
+    def reset(self):
+        super().reset()
         for (config,entities) in self.agents.values():
             for n in range(len(entities)):
-                rand_angle = Random.uniform(self.random_generator,a=0,b=360)
-                rand_pos = Vector3D(Random.uniform(self.random_generator,x_low_bnd,x_high_bnd),Random.uniform(self.random_generator,y_low_bnd,y_high_bnd),0) 
-                entities[n].set_angle(rand_angle)
-                entities[n].set_start_position(rand_pos)
-                count = 0
-                done = True
-                while not done and count+1 <= 200:
-                    done = True
-                    for m in range(len(entities)):
-                        if m!=n and rand_pos == entities[m].get_position(): # check_overlap(args)
+                entities[n].set_position(Vector3D(999,0,0),False)
+        for (config,entities) in self.objects.values():
+            for n in range(len(entities)):
+                entities[n].set_position(Vector3D(999,0,0),False)
+
+        for (config,entities) in self.agents.values():
+            for n in range(len(entities)):
+                position = entities[n].get_start_position()
+                if not entities[n].get_position_from_dict():
+                    count = 0
+                    done = False
+                    while not done and count < 200:
+                        done = True
+                        rand_pos = Vector3D(Random.uniform(self.random_generator,self.shape.min_vert_x(),self.shape.max_vert_x()),\
+                                    Random.uniform(self.random_generator,self.shape.min_vert_y(),self.shape.max_vert_y()),\
+                                    self.shape.floor + abs(entities[n].get_shape().min_vert_z())) 
+                        entities[n].set_position(rand_pos)
+                        if entities[n].get_shape().check_overlap(self.shape):
                             done = False
-                            rand_pos = Vector3D(Random.uniform(self.random_generator,x_low_bnd,x_high_bnd),Random.uniform(self.random_generator,y_low_bnd,y_high_bnd),0) 
-                            entities[n].set_start_position(rand_pos)
-                            break
+                        if done:
+                            for m in range(len(entities)):
+                                if m!=n and entities[n].get_shape().check_overlap(entities[m].get_shape()):
+                                    done = False
+                                    break
+                        count += 1
+                        if done: position = rand_pos
+                entities[n].set_start_position(position)
+                entities[n].set_start_orientation(entities[n].get_start_orientation())
+                if not entities[n].orientation_from_dict():
+                    rand_angle = Random.uniform(self.random_generator,0,360)
+                    entities[n].set_start_orientation(Vector3D(0,0,rand_angle))
 
         for (config,entities) in self.objects.values():
             for n in range(len(entities)):
-                rand_angle = Random.uniform(self.random_generator,a=0,b=360)
-                rand_pos = Vector3D(Random.uniform(self.random_generator,x_low_bnd,x_high_bnd),Random.uniform(self.random_generator,y_low_bnd,y_high_bnd),0) 
-                entities[n].set_angle(rand_angle)
-                entities[n].set_start_position(rand_pos)
-                count = 0
-                done = True
-                while not done and count+1 <= 200:
-                    done = True
-                    for m in range(len(entities)):
-                        if entities[n].get_shape() == "dense" and entities[m].get_shape()=="dense" and m!=n and rand_pos == entities[m].get_position():
+                position = entities[n].get_start_position()
+                if not entities[n].get_position_from_dict():
+                    count = 0
+                    done = False
+                    while not done and count < 200:
+                        done = True
+                        rand_pos = Vector3D(Random.uniform(self.random_generator,self.shape.min_vert_x(),self.shape.max_vert_x()),\
+                                    Random.uniform(self.random_generator,self.shape.min_vert_y(),self.shape.max_vert_y()),\
+                                    self.shape.floor + abs(entities[n].get_shape().min_vert_z())) 
+                        entities[n].set_position(rand_pos)
+                        if entities[n].get_shape().check_overlap(self.shape):
                             done = False
-                            rand_pos = Vector3D(Random.uniform(self.random_generator,x_low_bnd,x_high_bnd),Random.uniform(self.random_generator,y_low_bnd,y_high_bnd),0) 
-                            entities[n].set_start_position(rand_pos)
-                            break
-                        if entities[n].get_shape() == "flat" and entities[m].get_shape()=="flat" and m!=n and rand_pos == entities[m].get_position():
-                            done = False
-                            rand_pos = Vector3D(Random.uniform(self.random_generator,x_low_bnd,x_high_bnd),Random.uniform(self.random_generator,y_low_bnd,y_high_bnd),0) 
-                            entities[n].set_start_position(rand_pos)
-                            break
-                    if entities[n].get_shape() == "dense" and done:
-                        for (aconfig,aentities) in self.agents.values():
-                            for an in range(len(aentities)):
-                                if rand_pos == aentities[an].get_position():
+                        if done:
+                            for m in range(len(entities)):
+                                if entities[n].get_shape_type() == "dense" and entities[m].get_shape_type()=="dense" and m!=n and entities[n].get_shape().check_overlap(entities[m].get_shape()):
                                     done = False
-                                    rand_pos = Vector3D(Random.uniform(self.random_generator,x_low_bnd,x_high_bnd),Random.uniform(self.random_generator,y_low_bnd,y_high_bnd),0) 
-                                    entities[n].set_start_position(rand_pos)
                                     break
+                                if entities[n].get_shape_type() == "flat" and entities[m].get_shape_type()=="flat" and m!=n and entities[n].get_shape().check_overlap(entities[m].get_shape()):
+                                    done = False
+                                    break
+                        if done and entities[n].get_shape_type() == "dense":
+                            for (aconfig,aentities) in self.agents.values():
+                                for an in range(len(aentities)):
+                                    if entities[n].get_shape().check_overlap(aentities[an].get_shape()):
+                                        done = False
+                                        break
+                        count += 1
+                        if done: position = rand_pos
+                entities[n].set_start_position(position)
+                entities[n].set_start_orientation(entities[n].get_start_orientation())
+                if not entities[n].orientation_from_dict():
+                    rand_angle = Random.uniform(self.random_generator,0,360)
+                    entities[n].set_start_orientation(Vector3D(0,0,rand_angle))
 
-    def get_robot_positions(self):
-        positions = {}
-        for _,entities in self.agents.values():
-            temp = []
-            for n in range(len(entities)):
-                temp.append(entities[n].get_position())
-            positions.update({entities[0].entity():temp})
-        return positions
-    
-    def get_robot_angles(self):
-        angles = {}
-        for _,entities in self.agents.values():
-            temp = []
-            for n in range(len(entities)):
-                temp.append(entities[n].get_angle())
-            angles.update({entities[0].entity():temp})
-        return angles
-    
-    def get_object_positions(self):
-        positions = {}
-        for _,entities in self.objects.values():
-            temp = []
-            for n in range(len(entities)):
-                temp.append(entities[n].get_position())
-            positions.update({entities[0].entity():temp})
-        return positions
-    
-    def get_object_angles(self):
-        angles = {}
-        for _,entities in self.objects.values():
-            temp = []
-            for n in range(len(entities)):
-                temp.append(entities[n].get_angle())
-            angles.update({entities[0].entity():temp})
-        return angles
-    
-    def update(self):
-        super().update()
-    
     def close(self):
         super().close()
 
