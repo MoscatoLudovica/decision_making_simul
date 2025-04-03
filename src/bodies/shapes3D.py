@@ -6,25 +6,32 @@ class Shape3DFactory:
     @staticmethod
     def create_shape(_object:str,shape_type:str, config_elem:dict):
         if shape_type == "sphere":
-            return Sphere(_object,config_elem)
+            return Sphere(_object,shape_type,config_elem)
         elif shape_type in ("square","cube"):
-            return Cube(_object,config_elem)
+            return Cube(_object,shape_type,config_elem)
         elif shape_type in ("rectangle","cuboid"):
-            return Cuboid(_object,config_elem)
+            return Cuboid(_object,shape_type,config_elem)
         elif shape_type in ("circle","cylinder"):
-            return Cylinder(_object,config_elem)
+            return Cylinder(_object,shape_type,config_elem)
         elif shape_type == "point" or shape_type == "none":
             return Shape(_object,config_elem)
         else:
             raise ValueError(f"Unknown shape type: {shape_type}")
 
 class Shape:
+    rounding = 4
+    dense_shapes = ["sphere", "cube", "cuboid", "cylinder"]
+    flat_shapes = ["circle","square", "rectangle"]
+    no_shapes = ["point", "none"]
     def __init__(self, config_elem:dict, center: Vector3D = Vector3D()):
-        self.center = Vector3D(np.round(center.x,3),np.round(center.y,3),np.round(center.z,3))
-        self.floor = 0.0   # special entry used only for arena
+        self.center = Vector3D(np.round(center.x,Shape.rounding),np.round(center.y,Shape.rounding),np.round(center.z,Shape.rounding))
         self._object = "arena"
-        self.color = config_elem.get("color", "white")
+        self._id = "point"
+        self._color = config_elem.get("color", "white")
         self.vertices_list = []
+
+    def color(self) -> str:
+        return self._color
 
     def volume(self) -> float:
         pass
@@ -146,10 +153,11 @@ class Shape:
         return out
 
 class Sphere(Shape):
-    def __init__(self,_object, config_elem:dict, center: Vector3D = Vector3D()):
+    def __init__(self,_object:str,shape_type:str, config_elem:dict, center: Vector3D = Vector3D()):
         super().__init__(config_elem=config_elem, center=center)
         self._object = _object
-        self.radius = config_elem.get("radius", 1.0)
+        self._id = shape_type
+        self.radius = config_elem.get("diameter", 1.0) * 0.5
 
     def volume(self):
         return (4/3) * math.pi * self.radius ** 3
@@ -177,12 +185,13 @@ class Sphere(Shape):
                 x = self.center.x + self.radius * math.sin(phi) * math.cos(theta)
                 y = self.center.y + self.radius * math.sin(phi) * math.sin(theta)
                 z = self.center.z + self.radius * math.cos(phi)
-                self.vertices_list.append(Vector3D(np.round(x,3), np.round(y,3), np.round(z,3)))
+                self.vertices_list.append(Vector3D(np.round(x,Shape.rounding), np.round(y,Shape.rounding), np.round(z,Shape.rounding)))
 
 class Cube(Shape):
-    def __init__(self,_object, config_elem:dict, center: Vector3D = Vector3D()):
+    def __init__(self,_object:str,shape_type:str, config_elem:dict, center: Vector3D = Vector3D()):
         super().__init__(config_elem=config_elem, center=center)
         self._object = _object
+        self._id = shape_type
         self.side_length = config_elem.get("side", 1.0)
         self.set_vertices()
 
@@ -205,27 +214,43 @@ class Cube(Shape):
     def set_vertices(self):
         half_side = self.side_length * 0.5
         cx, cy, cz = self.center.x, self.center.y, self.center.z
-        self.vertices_list = [
-            Vector3D(np.round(cx - half_side,3), np.round(cy - half_side,3), np.round(cz - half_side,3)),
-            Vector3D(np.round(cx + half_side,3), np.round(cy - half_side,3), np.round(cz - half_side,3)),
-            Vector3D(np.round(cx + half_side,3), np.round(cy + half_side,3), np.round(cz - half_side,3)),
-            Vector3D(np.round(cx - half_side,3), np.round(cy + half_side,3), np.round(cz - half_side,3)),
-            Vector3D(np.round(cx - half_side,3), np.round(cy - half_side,3), np.round(cz + half_side,3)),
-            Vector3D(np.round(cx + half_side,3), np.round(cy - half_side,3), np.round(cz + half_side,3)),
-            Vector3D(np.round(cx + half_side,3), np.round(cy + half_side,3), np.round(cz + half_side,3)),
-            Vector3D(np.round(cx - half_side,3), np.round(cy + half_side,3), np.round(cz + half_side,3))
-        ]
         if self._object == "arena":
-            self.floor = self.min_vert_z()
+            self.vertices_list = [
+                Vector3D(np.round(cx - half_side,Shape.rounding), np.round(cy - half_side,Shape.rounding), 0),
+                Vector3D(np.round(cx + half_side,Shape.rounding), np.round(cy - half_side,Shape.rounding), 0),
+                Vector3D(np.round(cx + half_side,Shape.rounding), np.round(cy + half_side,Shape.rounding), 0),
+                Vector3D(np.round(cx - half_side,Shape.rounding), np.round(cy + half_side,Shape.rounding), 0),
+                Vector3D(np.round(cx - half_side,Shape.rounding), np.round(cy - half_side,Shape.rounding), np.round(self.side_length,Shape.rounding)),
+                Vector3D(np.round(cx + half_side,Shape.rounding), np.round(cy - half_side,Shape.rounding), np.round(self.side_length,Shape.rounding)),
+                Vector3D(np.round(cx + half_side,Shape.rounding), np.round(cy + half_side,Shape.rounding), np.round(self.side_length,Shape.rounding)),
+                Vector3D(np.round(cx - half_side,Shape.rounding), np.round(cy + half_side,Shape.rounding), np.round(self.side_length,Shape.rounding))
+            ]
         else:
-            
-        print(self._object,self.vertices_list)
-        print(self.center,self.min_vert_z())
+            if self._id in Shape.flat_shapes:
+                self.center.z = 0
+                self.vertices_list = [
+                    Vector3D(np.round(cx - half_side,Shape.rounding), np.round(cy - half_side,Shape.rounding), 0),
+                    Vector3D(np.round(cx + half_side,Shape.rounding), np.round(cy - half_side,Shape.rounding), 0),
+                    Vector3D(np.round(cx + half_side,Shape.rounding), np.round(cy + half_side,Shape.rounding), 0),
+                    Vector3D(np.round(cx - half_side,Shape.rounding), np.round(cy + half_side,Shape.rounding), 0)
+                ]
+            else:
+                self.vertices_list = [
+                    Vector3D(np.round(cx - half_side,Shape.rounding), np.round(cy - half_side,Shape.rounding), np.round(cz - half_side,Shape.rounding)),
+                    Vector3D(np.round(cx + half_side,Shape.rounding), np.round(cy - half_side,Shape.rounding), np.round(cz - half_side,Shape.rounding)),
+                    Vector3D(np.round(cx + half_side,Shape.rounding), np.round(cy + half_side,Shape.rounding), np.round(cz - half_side,Shape.rounding)),
+                    Vector3D(np.round(cx - half_side,Shape.rounding), np.round(cy + half_side,Shape.rounding), np.round(cz - half_side,Shape.rounding)),
+                    Vector3D(np.round(cx - half_side,Shape.rounding), np.round(cy - half_side,Shape.rounding), np.round(cz + half_side,Shape.rounding)),
+                    Vector3D(np.round(cx + half_side,Shape.rounding), np.round(cy - half_side,Shape.rounding), np.round(cz + half_side,Shape.rounding)),
+                    Vector3D(np.round(cx + half_side,Shape.rounding), np.round(cy + half_side,Shape.rounding), np.round(cz + half_side,Shape.rounding)),
+                    Vector3D(np.round(cx - half_side,Shape.rounding), np.round(cy + half_side,Shape.rounding), np.round(cz + half_side,Shape.rounding))
+                ]
 
 class Cuboid(Shape):
-    def __init__(self,_object, config_elem:dict, center: Vector3D = Vector3D()):
+    def __init__(self,_object:str,shape_type:str, config_elem:dict, center: Vector3D = Vector3D()):
         super().__init__(config_elem=config_elem, center=center)
         self._object = _object
+        self._id = shape_type
         self.width = config_elem.get("width", 1.0)
         self.height = config_elem.get("height", 1.0)
         self.depth = config_elem.get("depth", 1.0)
@@ -252,24 +277,44 @@ class Cuboid(Shape):
         half_height = self.height * 0.5
         half_depth = self.depth * 0.5
         cx, cy, cz = self.center.x, self.center.y, self.center.z
-        self.vertices_list = [
-            Vector3D(np.round(cx - half_width,3), np.round(cy - half_depth,3), np.round(cz - half_height,3)),
-            Vector3D(np.round(cx + half_width,3), np.round(cy - half_depth,3), np.round(cz - half_height,3)),
-            Vector3D(np.round(cx + half_width,3), np.round(cy + half_depth,3), np.round(cz - half_height,3)),
-            Vector3D(np.round(cx - half_width,3), np.round(cy + half_depth,3), np.round(cz - half_height,3)),
-            Vector3D(np.round(cx - half_width,3), np.round(cy - half_depth,3), np.round(cz + half_height,3)),
-            Vector3D(np.round(cx + half_width,3), np.round(cy - half_depth,3), np.round(cz + half_height,3)),
-            Vector3D(np.round(cx + half_width,3), np.round(cy + half_depth,3), np.round(cz + half_height,3)),
-            Vector3D(np.round(cx - half_width,3), np.round(cy + half_depth,3), np.round(cz + half_height,3))
-        ]
         if self._object == "arena":
-            self.floor = self.min_vert_z()
+            self.vertices_list = [
+                Vector3D(np.round(cx - half_width,Shape.rounding), np.round(cy - half_depth,Shape.rounding), 0),
+                Vector3D(np.round(cx + half_width,Shape.rounding), np.round(cy - half_depth,Shape.rounding), 0),
+                Vector3D(np.round(cx + half_width,Shape.rounding), np.round(cy + half_depth,Shape.rounding), 0),
+                Vector3D(np.round(cx - half_width,Shape.rounding), np.round(cy + half_depth,Shape.rounding), 0),
+                Vector3D(np.round(cx - half_width,Shape.rounding), np.round(cy - half_depth,Shape.rounding), np.round(self.height,Shape.rounding)),
+                Vector3D(np.round(cx + half_width,Shape.rounding), np.round(cy - half_depth,Shape.rounding), np.round(self.height,Shape.rounding)),
+                Vector3D(np.round(cx + half_width,Shape.rounding), np.round(cy + half_depth,Shape.rounding), np.round(self.height,Shape.rounding)),
+                Vector3D(np.round(cx - half_width,Shape.rounding), np.round(cy + half_depth,Shape.rounding), np.round(self.height,Shape.rounding))
+            ]
+        else:
+            if self._id in Shape.flat_shapes:
+                self.center.z = 0
+                self.vertices_list = [
+                    Vector3D(np.round(cx - half_width,Shape.rounding), np.round(cy - half_depth,Shape.rounding), 0),
+                    Vector3D(np.round(cx + half_width,Shape.rounding), np.round(cy - half_depth,Shape.rounding), 0),
+                    Vector3D(np.round(cx + half_width,Shape.rounding), np.round(cy + half_depth,Shape.rounding), 0),
+                    Vector3D(np.round(cx - half_width,Shape.rounding), np.round(cy + half_depth,Shape.rounding), 0)
+                ]
+            else:
+                self.vertices_list = [
+                    Vector3D(np.round(cx - half_width,Shape.rounding), np.round(cy - half_depth,Shape.rounding), np.round(cz - half_height,Shape.rounding)),
+                    Vector3D(np.round(cx + half_width,Shape.rounding), np.round(cy - half_depth,Shape.rounding), np.round(cz - half_height,Shape.rounding)),
+                    Vector3D(np.round(cx + half_width,Shape.rounding), np.round(cy + half_depth,Shape.rounding), np.round(cz - half_height,Shape.rounding)),
+                    Vector3D(np.round(cx - half_width,Shape.rounding), np.round(cy + half_depth,Shape.rounding), np.round(cz - half_height,Shape.rounding)),
+                    Vector3D(np.round(cx - half_width,Shape.rounding), np.round(cy - half_depth,Shape.rounding), np.round(cz + half_height,Shape.rounding)),
+                    Vector3D(np.round(cx + half_width,Shape.rounding), np.round(cy - half_depth,Shape.rounding), np.round(cz + half_height,Shape.rounding)),
+                    Vector3D(np.round(cx + half_width,Shape.rounding), np.round(cy + half_depth,Shape.rounding), np.round(cz + half_height,Shape.rounding)),
+                    Vector3D(np.round(cx - half_width,Shape.rounding), np.round(cy + half_depth,Shape.rounding), np.round(cz + half_height,Shape.rounding))
+                ]
 
 class Cylinder(Shape):
-    def __init__(self,_object:str, config_elem:dict, center: Vector3D = Vector3D()):
+    def __init__(self,_object:str,shape_type:str, config_elem:dict, center: Vector3D = Vector3D()):
         super().__init__(config_elem=config_elem, center=center)
         self._object = _object
-        self.radius = config_elem.get("radius", 1.0)
+        self._id = shape_type
+        self.radius = config_elem.get("diameter", 1.0) * 0.5
         self.height = config_elem.get("height", 1.0)
         self.set_vertices()
 
@@ -293,15 +338,26 @@ class Cylinder(Shape):
         self.vertices_list = []
         num_vertices = 120
         angle_increment = 2 * math.pi / num_vertices
-        for i in range(num_vertices):
-            angle = i * angle_increment
-            x = self.center.x + self.radius * math.cos(angle)
-            y = self.center.y + self.radius * math.sin(angle)
-            z1 = self.center.z - self.height * 0.5
-            z2 = self.center.z + self.height * 0.5
-            self.vertices_list.append(Vector3D(np.round(x,3), np.round(y,3), np.round(z1,3)))
-            self.vertices_list.append(Vector3D(np.round(x,3), np.round(y,3), np.round(z2,3)))
         if self._object == "arena":
-            self.floor = self.min_vert_z()
-        print(self._object,len(self.vertices_list))
-        print(self.center,self.min_vert_z())
+            for i in range(num_vertices):
+                angle = i * angle_increment
+                x = self.center.x + self.radius * math.cos(angle)
+                y = self.center.y + self.radius * math.sin(angle)
+                z1 = 0
+                z2 = self.height
+                self.vertices_list.append(Vector3D(np.round(x,Shape.rounding), np.round(y,Shape.rounding), np.round(z1,Shape.rounding)))
+                self.vertices_list.append(Vector3D(np.round(x,Shape.rounding), np.round(y,Shape.rounding), np.round(z2,Shape.rounding)))
+        else:
+            for i in range(num_vertices):
+                angle = i * angle_increment
+                x = self.center.x + self.radius * math.cos(angle)
+                y = self.center.y + self.radius * math.sin(angle)
+                z = 0
+                if self._id in Shape.flat_shapes:
+                    self.center.z = z
+                    self.vertices_list.append(Vector3D(np.round(x,Shape.rounding), np.round(y,Shape.rounding), np.round(z,Shape.rounding)))
+                else:
+                    z1 = self.center.z - self.height * 0.5
+                    z2 = self.center.z + self.height * 0.5
+                    self.vertices_list.append(Vector3D(np.round(x,Shape.rounding), np.round(y,Shape.rounding), np.round(z1,Shape.rounding)))
+                    self.vertices_list.append(Vector3D(np.round(x,Shape.rounding), np.round(y,Shape.rounding), np.round(z2,Shape.rounding)))

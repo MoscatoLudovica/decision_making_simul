@@ -1,7 +1,7 @@
 import math
 
 class Vector3D:
-    def __init__(self, x=0, y=0, z=0):
+    def __init__(self, x:float=0, y:float=0, z:float=0):
         self.x = x
         self.y = y
         self.z = z

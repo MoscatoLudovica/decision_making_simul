@@ -112,7 +112,7 @@ class Config:
                                 raise ValueError(f"The '{field}' field must be boolean")
                 experiment = {
                     "environment": {
-                        "multi_processing": environment.get("multi_processing",False),
+                        "parallel_experiments": environment.get("parallel_experiments",False),
                         "time_limit": environment.get("time_limit",500),
                         "num_runs": environment.get("num_runs",1),
                         "render": environment.get("render", False),

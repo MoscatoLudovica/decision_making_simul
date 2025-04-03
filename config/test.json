@@ -1,8 +1,9 @@
 {
     "environment":{
-        "multi_processing": false,
-        "time_limit": 20,
-        "num_runs": 2,
+        "parallel_experiments": false,
+        "ticks_per_second": 10,
+        "time_limit": 12,
+        "num_runs": 1,
         "render": true,
         "results":{
             "_id": "basic",
@@ -14,7 +15,7 @@
             "_id": "2D",
             "show_trajectories": false,
             "show_communication": false,
-            "pixels_per_meter": 100
+            "pixels_per_meter": 300
         },
         "arenas":{
             "arena_0":{
@@ -29,21 +30,18 @@
                 "_id": "interactive",
                 "number": [1],
                 "shape": "circle",
-                "radius": 0.01,
-                "position":[[0,0,0]],
+                "diameter": 0.2,
                 "orientation":[[0,0,0]],
-                "color": "red"
+                "color": "green"
             }
         },
         "agents":{
             "movable_0":{
                 "ticks_per_second": 31,
-                "number": [1],
-                "position":[[0,0,0]],
-                "orientation":[[0,0,180]],
+                "number": [7],
                 "shape": "cylinder",
                 "height": 0.02,
-                "radius": 0.033,
+                "diameter": 0.033,
                 "color": "blue"
             }
         }   
