@@ -1,4 +1,4 @@
-import logging
+import math, logging
 from random import Random
 from geometry_utils.vector3D import Vector3D
 from bodies.shapes3D import Shape3DFactory
@@ -89,6 +89,7 @@ class Agent(Entity):
 
     def run(self):
         pass
+    
 class StaticObject(Object):
     def __init__(self,entity_type:str, config_elem:dict,_id:int=0):
         super().__init__(entity_type,config_elem,_id)
@@ -151,6 +152,7 @@ class StaticObject(Object):
 
     def get_orientation(self):
         return self.orientation
+    
 class StaticAgent(Agent):
     def __init__(self,entity_type:str, config_elem:dict,_id:int=0):
         super().__init__(entity_type,config_elem,_id)
@@ -218,17 +220,40 @@ class MovableObject(StaticObject):
     def __init__(self,entity_type:str, config_elem:dict,_id:int=0):
         super().__init__(entity_type,config_elem,_id)
         self.velocity = Vector3D()
-        self.max_absolute_velocity = 0.01
-        self.max_angular_velocity = 0.0
+        # self.max_absolute_velocity = 0.01
+        # self.max_angular_velocity = 0.01
 
 class MovableAgent(StaticAgent):
     def __init__(self,entity_type:str, config_elem:dict,_id:int=0):
         super().__init__(entity_type,config_elem,_id)
         self.velocity = Vector3D()
         self.max_absolute_velocity = 0.01 / self.ticks_per_second
-        self.max_angular_velocity = 0.0
-    
-    def run(self):
-        self.velocity = Vector3D(Random.uniform(self.random_generator,-self.max_absolute_velocity,self.max_absolute_velocity),Random.uniform(self.random_generator,-self.max_absolute_velocity,self.max_absolute_velocity),0)
-        self.position = self.position + self.velocity
+        self.max_angular_velocity = 0.01 / self.ticks_per_second
+
+    def run(self,arena_shape):
+        self.prev_orientation = self.orientation
+        self.prev_position = self.position
+        delta_orientation = Vector3D(0,0,
+                                     Random.uniform(self.random_generator,0,self.max_angular_velocity))
+        self.orientation = self.orientation + delta_orientation
+        self.shape.rotate_z(delta_orientation.z)
+        forward_vector = Vector3D(self.max_absolute_velocity * -math.sin(math.radians(self.orientation.z)),
+                                  self.max_absolute_velocity * math.cos(math.radians(self.orientation.z)),
+                                  0)
+        self.position = self.position + forward_vector
         self.shape.translate(self.position)
+        if self.shape.check_overlap(arena_shape):
+            # Calculate the normal vector of the arena border at the collision point
+            collision_normal = self.shape.get_collision_normal(arena_shape)
+            
+            # Project the velocity vector onto the tangent of the collision surface
+            velocity_projection = self.velocity - collision_normal * (self.velocity.dot(collision_normal))
+            
+            # Adjust orientation to align with the sliding direction
+            slide_angle = math.degrees(math.atan2(velocity_projection.y, velocity_projection.x))
+            self.orientation.z = slide_angle
+            self.shape.rotate_z(self.orientation.z - self.prev_orientation.z)
+            
+            # Update position and orientation based on the projected velocity
+            self.position = self.prev_position + velocity_projection
+            self.shape.translate(self.position - self.prev_position)

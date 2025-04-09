@@ -2,9 +2,10 @@
     "environment":{
         "parallel_experiments": false,
         "ticks_per_second": 10,
-        "time_limit": 12,
+        "time_limit": 60,
         "num_runs": 1,
         "render": true,
+        "auto_close_gui": false,
         "results":{
             "_id": "basic",
             "save": true,
@@ -20,7 +21,7 @@
         "arenas":{
             "arena_0":{
                 "random_seed": -1,
-                "_id": "square",
+                "_id": "circle",
                 "side": 1,
                 "color": "white"
             }
@@ -31,14 +32,14 @@
                 "number": [1],
                 "shape": "circle",
                 "diameter": 0.2,
-                "orientation":[[0,0,0]],
                 "color": "green"
             }
         },
         "agents":{
             "movable_0":{
                 "ticks_per_second": 31,
-                "number": [7],
+                "number": [3],
+                "position":[[0,0,0]],
                 "shape": "cylinder",
                 "height": 0.02,
                 "diameter": 0.033,

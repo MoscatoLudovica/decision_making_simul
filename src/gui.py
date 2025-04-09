@@ -105,7 +105,6 @@ class GUI_2D(QWidget):
 
         # Draw the transformed arena
         polygon = QPolygonF(transformed_vertices)
-        self.scene.clear()
         self.scene.addPolygon(polygon, QPen(Qt.black, 2), QBrush(QColor(200, 200, 200)))
 
     def update_scene(self):

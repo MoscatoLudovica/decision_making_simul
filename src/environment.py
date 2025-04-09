@@ -24,6 +24,7 @@ class Environment():
         self.time_limit = int(config_elem.environment.get("time_limit",0))
         self.gui_id = config_elem.gui.get("_id","2D")
         self.render = [config_elem.environment.get("render",False),config_elem.gui]
+        self.auto_close_gui = config_elem.environment.get("auto_close_gui",True)
 
     def start(self):
         pass
@@ -77,7 +78,7 @@ class SingleProcessEnvironment(Environment):
                 gui_process.start()
                 killed = 0  
                 while gui_process.is_alive():
-                    if psutil.Process(gui_process.pid).status() == psutil.STATUS_ZOMBIE:
+                    if psutil.Process(gui_process.pid).status() == psutil.STATUS_ZOMBIE or psutil.Process(gui_process.pid).status() == psutil.STATUS_DEAD:
                         gui_out_arena_queue.put({"status": "end"})
                         gui_out_agents_queue.put({"status": "end"})
                         killed = 1
@@ -87,7 +88,7 @@ class SingleProcessEnvironment(Environment):
                         agents_process.join()
                         gui_process.terminate()
                         gui_process.join()
-                    if not arena_process.is_alive():
+                    if self.auto_close_gui and not arena_process.is_alive():
                         arena_process.join()
                         if agents_process.is_alive(): agents_process.terminate()
                         agents_process.join()

@@ -122,7 +122,7 @@ class EntityManager:
                 if arena_queue.qsize()>0: data_in = arena_queue.get()
                 for _,entities in self.agents.values():
                     for n in range(len(entities)):
-                        entities[n].run()
+                        entities[n].run(self.arena_shape) # invoke the run method in a thread
                 # print(f"agents_ticks {t} {ticks_per_second}")
                 agents_data = {
                     "status": [t,ticks_per_second],

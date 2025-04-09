@@ -8,7 +8,7 @@ class Shape3DFactory:
         if shape_type == "sphere":
             return Sphere(_object,shape_type,config_elem)
         elif shape_type in ("square","cube"):
-            return Cube(_object,shape_type,config_elem)
+            return Cuboid(_object,shape_type,config_elem)
         elif shape_type in ("rectangle","cuboid"):
             return Cuboid(_object,shape_type,config_elem)
         elif shape_type in ("circle","cylinder"):
@@ -40,7 +40,7 @@ class Shape:
         pass
 
     def center_of_mass(self) -> Vector3D:
-        pass
+        return self.center
 
     def vertices(self) -> list:
         pass
@@ -152,6 +152,31 @@ class Shape:
             if v.z > out: out = v.z
         return out
 
+    def get_collision_normal(self, arena_shape):
+        if arena_shape._id == "circle":
+            # Per un'arena circolare, la normale è il vettore dal centro dell'arena al centro dell'agente
+            arena_center = arena_shape.center
+            collision_point = self.center
+            normal_vector = collision_point - arena_center
+            return normal_vector.normalize()
+
+        else:
+            # Per un'arena rettangolare, calcola la normale in base al lato colpito
+            collision_point = self.center
+            min_x, max_x = arena_shape.min_vert_x(), arena_shape.max_vert_x()
+            min_y, max_y = arena_shape.min_vert_y(), arena_shape.max_vert_y()
+
+            if collision_point.x <= min_x:
+                return Vector3D(-1, 0, 0)  # Normale verso sinistra
+            elif collision_point.x >= max_x:
+                return Vector3D(1, 0, 0)  # Normale verso destra
+            elif collision_point.y <= min_y:
+                return Vector3D(0, -1, 0)  # Normale verso il basso
+            elif collision_point.y >= max_y:
+                return Vector3D(0, 1, 0)  # Normale verso l'alto
+
+        return Vector3D(0, 0, 0)
+
 class Sphere(Shape):
     def __init__(self,_object:str,shape_type:str, config_elem:dict, center: Vector3D = Vector3D()):
         super().__init__(config_elem=config_elem, center=center)
@@ -165,9 +190,6 @@ class Sphere(Shape):
     def surface_area(self):
         return 4 * math.pi * self.radius ** 2
 
-    def center_of_mass(self):
-        return self.center
-
     def vertices(self):
         return self.vertices_list
     
@@ -177,7 +199,7 @@ class Sphere(Shape):
 
     def set_vertices(self):
         self.vertices_list = []
-        num_vertices = 260
+        num_vertices = 90
         for i in range(num_vertices):
             theta = 2 * math.pi * (i / num_vertices)
             for j in range(num_vertices):
@@ -200,9 +222,6 @@ class Cube(Shape):
 
     def surface_area(self):
         return 6 * self.side_length ** 2
-
-    def center_of_mass(self):
-        return self.center
 
     def vertices(self):
         return self.vertices_list
@@ -254,6 +273,8 @@ class Cuboid(Shape):
         self.width = config_elem.get("width", 1.0)
         self.height = config_elem.get("height", 1.0)
         self.depth = config_elem.get("depth", 1.0)
+        if config_elem.get("side", None) is not None :
+            self.width,self.height, self.depth = config_elem.get("side"),config_elem.get("side"),config_elem.get("side")
         self.set_vertices()
 
     def volume(self):
@@ -261,9 +282,6 @@ class Cuboid(Shape):
 
     def surface_area(self):
         return 2 * (self.width * self.height + self.height * self.depth + self.depth * self.width)
-
-    def center_of_mass(self):
-        return self.center
 
     def vertices(self):
         return self.vertices_list
@@ -324,9 +342,6 @@ class Cylinder(Shape):
     def surface_area(self):
         return 2 * math.pi * self.radius * (self.radius + self.height)
 
-    def center_of_mass(self):
-        return Vector3D(self.center.x, self.center.y, self.center.z + self.height * 0.5)
-
     def vertices(self):
         return self.vertices_list
 
@@ -336,7 +351,7 @@ class Cylinder(Shape):
 
     def set_vertices(self):
         self.vertices_list = []
-        num_vertices = 120
+        num_vertices = 90
         angle_increment = 2 * math.pi / num_vertices
         if self._object == "arena":
             for i in range(num_vertices):
