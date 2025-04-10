@@ -39,6 +39,13 @@ class Shape:
     def vertices(self) -> list:
         return self.vertices_list
     
+    def translate(self, translation_vector:Vector3D):
+        self.center = self.center + translation_vector
+        self.set_vertices()
+    
+    def set_vertices(self):
+        pass
+
     def check_overlap(self, _shape):
         for vertex in self.vertices():
             if _shape._object == "arena":
@@ -55,30 +62,22 @@ class Shape:
     def _is_point_inside_shape(self, point, shape):
         # This is a placeholder method. The actual implementation will depend on the specific shape.
         # For simplicity, let's assume it checks if a point is inside a bounding box of the shape.
-        min_x = min(vertex.x for vertex in shape.vertices())
-        max_x = max(vertex.x for vertex in shape.vertices())
-        min_y = min(vertex.y for vertex in shape.vertices())
-        max_y = max(vertex.y for vertex in shape.vertices())
-        min_z = min(vertex.z for vertex in shape.vertices())
-        max_z = max(vertex.z for vertex in shape.vertices())
+        min_v = shape.min_vert()
+        max_v = shape.max_vert()
 
-        return (min_x <= point.x <= max_x and
-                min_y <= point.y <= max_y and
-                min_z <= point.z <= max_z)
+        return (min_v.x <= point.x <= max_v.x and
+                min_v.y <= point.y <= max_v.y and
+                min_v.z <= point.z <= max_v.z)
     
     def _is_point_outside_shape(self, point, shape):
         # This is a placeholder method. The actual implementation will depend on the specific shape.
         # For simplicity, let's assume it checks if a point is inside a bounding box of the shape.
-        min_x = min(vertex.x for vertex in shape.vertices())
-        max_x = max(vertex.x for vertex in shape.vertices())
-        min_y = min(vertex.y for vertex in shape.vertices())
-        max_y = max(vertex.y for vertex in shape.vertices())
-        min_z = min(vertex.z for vertex in shape.vertices())
-        max_z = max(vertex.z for vertex in shape.vertices())
+        min_v = shape.min_vert()
+        max_v = shape.max_vert()
 
-        return (not (min_x <= point.x <= max_x) or
-                not (min_y <= point.y <= max_y) or
-                not (min_z <= point.z <= max_z))
+        return (not (min_v.x <= point.x <= max_v.x) or
+                not (min_v.y <= point.y <= max_v.y) or
+                not (min_v.z <= point.z <= max_v.z))
 
     def rotate_x(self, angle:float):
         angle_rad = math.radians(angle)
@@ -101,42 +100,22 @@ class Shape:
             new_vertex = rotated_vertex + self.center
             vertex.x, vertex.y, vertex.z = new_vertex.x, new_vertex.y, new_vertex.z
 
-    def min_vert_x(self):
-        out = 99999
+    def min_vert(self):
+        out_x,out_y,out_z = 99999,99999,99999
         for v in self.vertices_list:
-            if v.x < out: out = v.x
-        return out
+            if v.x < out_x: out_x = v.x
+            if v.y < out_y: out_y = v.y
+            if v.z < out_z: out_z = v.z
+        return Vector3D(out_x,out_y,out_z)
 
-    def max_vert_x(self):
-        out = -1
+    def max_vert(self):
+        out_x,out_y,out_z = -1,-1,-1
         for v in self.vertices_list:
-            if v.x > out: out = v.x
-        return out
-    
-    def min_vert_y(self):
-        out = 99999
-        for v in self.vertices_list:
-            if v.y < out: out = v.y
-        return out
-
-    def max_vert_y(self):
-        out = -1
-        for v in self.vertices_list:
-            if v.y > out: out = v.y
-        return out
-    
-    def min_vert_z(self):
-        out = 99999
-        for v in self.vertices_list:
-            if v.z < out: out = v.z
-        return out
-
-    def max_vert_z(self):
-        out = -1
-        for v in self.vertices_list:
-            if v.z > out: out = v.z
-        return out
-    
+            if v.x > out_x: out_x = v.x
+            if v.y > out_y: out_y = v.y
+            if v.z > out_z: out_z = v.z
+        return Vector3D(out_x,out_y,out_z)
+        
 class Sphere(Shape):
     def __init__(self,_object:str,shape_type:str, config_elem:dict, center: Vector3D = Vector3D()):
         super().__init__(config_elem=config_elem, center=center)
@@ -149,10 +128,6 @@ class Sphere(Shape):
 
     def surface_area(self):
         return 4 * math.pi * self.radius ** 2
-    
-    def translate(self, translation_vector):
-        self.center = self.center + translation_vector
-        self.set_vertices()
 
     def set_vertices(self):
         self.vertices_list = []
@@ -182,10 +157,6 @@ class Cuboid(Shape):
     def surface_area(self):
         if self._id in Shape.flat_shapes: return self.width * self.depth
         else: return 2 * (self.width * self.height + self.height * self.depth + self.depth * self.width)
-
-    def translate(self, translation_vector):
-        self.center = self.center + translation_vector
-        self.set_vertices()
 
     def set_vertices(self):
         half_width = self.width * 0.5
@@ -238,10 +209,6 @@ class Cylinder(Shape):
 
     def surface_area(self):
         return 2 * math.pi * self.radius * (self.radius + self.height)
-
-    def translate(self, translation_vector):
-        self.center = self.center + translation_vector
-        self.set_vertices()
 
     def set_vertices(self):
         self.vertices_list = []

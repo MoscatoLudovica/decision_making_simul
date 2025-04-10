@@ -114,27 +114,10 @@ class GUI_2D(QWidget):
         # Draw the arena
         self.draw_arena()
 
-        # Draw agents
-        if self.agents_shapes != None:
-            self.scene.setBackgroundBrush(QColor(240, 240, 240))
-            for key, entities in self.agents_shapes.items():
-                for entity in entities:
-                    # Draw the agent's vertices as a polygon
-                    entity_vertices = [
-                        QPointF(
-                            vertex.x * self.pixels_per_meter + self.offset_x,
-                            vertex.y * self.pixels_per_meter + self.offset_y
-                        )
-                        for vertex in entity.vertices()
-                    ]
-                    entity_polygon = QPolygonF(entity_vertices)
-                    entity_color = QColor(entity.color())  # Use the agent's color
-                    self.scene.addPolygon(entity_polygon, QPen(entity_color, 1), QBrush(entity_color))
         if self.objects_shapes != None:
             self.scene.setBackgroundBrush(QColor(240, 240, 240))
             for key, entities in self.objects_shapes.items():
                 for entity in entities:
-                    # Draw the agent's vertices as a polygon
                     entity_vertices = [
                         QPointF(
                             vertex.x * self.pixels_per_meter + self.offset_x,
@@ -143,7 +126,21 @@ class GUI_2D(QWidget):
                         for vertex in entity.vertices()
                     ]
                     entity_polygon = QPolygonF(entity_vertices)
-                    entity_color = QColor(entity.color())  # Use the agent's color
+                    entity_color = QColor(entity.color())
+                    self.scene.addPolygon(entity_polygon, QPen(entity_color, 1), QBrush(entity_color))
+        if self.agents_shapes != None:
+            self.scene.setBackgroundBrush(QColor(240, 240, 240))
+            for key, entities in self.agents_shapes.items():
+                for entity in entities:
+                    entity_vertices = [
+                        QPointF(
+                            vertex.x * self.pixels_per_meter + self.offset_x,
+                            vertex.y * self.pixels_per_meter + self.offset_y
+                        )
+                        for vertex in entity.vertices()
+                    ]
+                    entity_polygon = QPolygonF(entity_vertices)
+                    entity_color = QColor(entity.color())
                     self.scene.addPolygon(entity_polygon, QPen(entity_color, 1), QBrush(entity_color))
 
 # class GUI_3D:

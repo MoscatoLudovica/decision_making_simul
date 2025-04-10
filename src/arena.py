@@ -27,17 +27,11 @@ class Arena():
         self.ticks_per_second = config_elem.environment.get("ticks_per_second", 10)
         self.random_seed = config_elem.arena.get("random_seed",-1)
         self._id = "none" if config_elem.arena.get("_id") == "abstract" else config_elem.arena.get("_id","none") 
-        self.shape = None
-        if self._id != "none":
-            self.shape = Shape3DFactory.create_shape("arena",self._id, {key:val for key,val in config_elem.arena.items()})
         self.objects = {object_type: (config_elem.environment.get("objects",{}).get(object_type),[]) for object_type in config_elem.environment.get("objects",{}).keys()}
         self.agents_shapes = {}
 
     def get_id(self):
         return self._id
-    
-    def get_shape(self):
-        return self.shape
     
     def get_seed(self):
         return self.random_seed
@@ -63,7 +57,7 @@ class Arena():
             for n in range(config["number"]):
                 entities.append(EntityFactory.create_entity(entity_type="object_"+key,config_elem=config,_id=n))
                 
-    def run(self,num_runs,time_limit, arena_queue, agents_queue, gui_in_queue, gui_out_queue:multiprocessing.Queue , render:bool=False):
+    def run(self,num_runs,time_limit, arena_queue:multiprocessing.Queue, agents_queue:multiprocessing.Queue, gui_in_queue:multiprocessing.Queue, gui_out_queue:multiprocessing.Queue , render:bool=False):
         pass
 
     def reset(self):
@@ -84,6 +78,9 @@ class AbstractArena(Arena):
         super().__init__(config_elem)
         logging.info("Abstract arena created successfully")
     
+    def get_shape(self):
+        pass
+    
     def close(self):
         super().close()
 
@@ -91,7 +88,11 @@ class SolidArena(Arena):
     
     def __init__(self, config_elem:Config):
         super().__init__(config_elem)
+        self.shape = Shape3DFactory.create_shape("arena",self._id, {key:val for key,val in config_elem.arena.items()})
 
+    def get_shape(self):
+        return self.shape
+    
     def initialize(self):
         super().initialize()
         for (config,entities) in self.objects.values():
@@ -108,9 +109,11 @@ class SolidArena(Arena):
                     while not done and count < 200:
                         done = True
                         entities[n].to_origin()
-                        rand_pos = Vector3D(Random.uniform(self.random_generator,self.shape.min_vert_x(),self.shape.max_vert_x()),
-                                    Random.uniform(self.random_generator,self.shape.min_vert_y(),self.shape.max_vert_y()),
-                                    abs(entities[n].get_shape().min_vert_z())) 
+                        min_v  = self.shape.min_vert()
+                        max_v  = self.shape.max_vert()
+                        rand_pos = Vector3D(Random.uniform(self.random_generator,min_v.x,max_v.x),
+                                    Random.uniform(self.random_generator,min_v.y,max_v.y),
+                                    abs(entities[n].get_shape().min_vert().z)) 
                         entities[n].set_position(rand_pos)
                         if entities[n].get_shape().check_overlap(self.shape)[0]:
                             done = False
@@ -128,7 +131,7 @@ class SolidArena(Arena):
                         raise Exception(f"Impossible to place object {entities[n].entity()} in the arena")
                 else:
                     position = entities[n].get_start_position()
-                    entities[n].set_start_position(Vector3D(position.x,position.y,position.z + abs(entities[n].get_shape().min_vert_z())))
+                    entities[n].set_start_position(Vector3D(position.x,position.y,position.z + abs(entities[n].get_shape().min_vert().z)))
 
     def get_object_positions(self) -> dict:
         positions = {}
@@ -157,7 +160,7 @@ class SolidArena(Arena):
             shapes.update({entities[0].entity():temp})
         return shapes
     
-    def run(self,num_runs,time_limit, arena_queue, agents_queue, gui_in_queue, gui_out_queue = multiprocessing.Queue, render:bool=False):
+    def run(self,num_runs,time_limit, arena_queue:multiprocessing.Queue, agents_queue:multiprocessing.Queue, gui_in_queue:multiprocessing.Queue, gui_out_queue:multiprocessing.Queue, render:bool=False):
         """Function to run the arena in a separate process"""
         ticks_limit = time_limit*self.ticks_per_second + 1
         for run in range(1, num_runs + 1):
@@ -219,9 +222,11 @@ class SolidArena(Arena):
                     done = False
                     while not done and count < 200:
                         done = True
-                        rand_pos = Vector3D(Random.uniform(self.random_generator,self.shape.min_vert_x(),self.shape.max_vert_x()),
-                                    Random.uniform(self.random_generator,self.shape.min_vert_y(),self.shape.max_vert_y()),
-                                    abs(entities[n].get_shape().min_vert_z())) 
+                        min_v  = self.shape.min_vert()
+                        max_v  = self.shape.max_vert()
+                        rand_pos = Vector3D(Random.uniform(self.random_generator,min_v.y,max_v.y),
+                                    Random.uniform(self.random_generator,min_v.y,max_v.y),
+                                    abs(entities[n].get_shape().min_vert().z)) 
                         entities[n].to_origin()
                         entities[n].set_position(rand_pos)
                         if entities[n].get_shape().check_overlap(self.shape)[0]:

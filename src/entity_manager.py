@@ -24,9 +24,11 @@ class EntityManager:
                     while not done and count < 200:
                         done = True
                         entities[n].to_origin()
-                        rand_pos = Vector3D(Random.uniform(random_generator,self.arena_shape.min_vert_x(),self.arena_shape.max_vert_x()),\
-                                            Random.uniform(random_generator,self.arena_shape.min_vert_y(),self.arena_shape.max_vert_y()),\
-                                            abs(entities[n].get_shape().min_vert_z())) 
+                        min_v  = self.arena_shape.min_vert()
+                        max_v  = self.arena_shape.max_vert()
+                        rand_pos = Vector3D(Random.uniform(random_generator,min_v.x,max_v.x),
+                                            Random.uniform(random_generator,min_v.y,max_v.y),
+                                            abs(entities[n].get_shape().min_vert().z)) 
                         entities[n].set_position(rand_pos)
                         if entities[n].get_shape().check_overlap(self.arena_shape):
                             done = False
@@ -48,7 +50,7 @@ class EntityManager:
                     
                 else:
                     position = entities[n].get_start_position()
-                    entities[n].set_start_position(Vector3D(position.x,position.y,position.z + (abs(entities[n].get_shape().min_vert_z()))))
+                    entities[n].set_start_position(Vector3D(position.x,position.y,position.z + (abs(entities[n].get_shape().min_vert().z))))
 
     def reset(self,random_generator,object_shapes):
         for (config,entities) in self.agents.values():
@@ -64,9 +66,11 @@ class EntityManager:
                     done = False
                     while not done and count < 200:
                         done = True
-                        rand_pos = Vector3D(Random.uniform(random_generator,self.arena_shape.min_vert_x(),self.arena_shape.max_vert_x()),\
-                                    Random.uniform(random_generator,self.arena_shape.min_vert_y(),self.arena_shape.max_vert_y()),\
-                                    abs(entities[n].get_shape().min_vert_z())) 
+                        min_v  = self.arena_shape.min_vert()
+                        max_v  = self.arena_shape.max_vert()
+                        rand_pos = Vector3D(Random.uniform(random_generator,min_v.x,max_v.x),
+                                            Random.uniform(random_generator,min_v.y,max_v.y),
+                                            abs(entities[n].get_shape().min_vert().z)) 
                         entities[n].to_origin()
                         entities[n].set_position(rand_pos)
                         if entities[n].get_shape().check_overlap(self.arena_shape):
@@ -95,7 +99,7 @@ class EntityManager:
     def close(self,):
         pass
 
-    def run(self,num_runs,time_limit, arena_queue, agents_queue, gui_out_queue: multiprocessing.Queue, render:bool=False):
+    def run(self,num_runs,time_limit, arena_queue:multiprocessing.Queue, agents_queue:multiprocessing.Queue, gui_out_queue: multiprocessing.Queue, render:bool=False):
         ticks_per_second = 1
         for (config,entities) in self.agents.values():
             ticks_per_second = entities[0].ticks()

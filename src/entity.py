@@ -22,8 +22,6 @@ class Entity:
     def __init__(self,entity_type:str, config_elem: dict,_id:int=0):
         self.entity_type = entity_type
         self._id = _id
-        self.shape_type = None
-        self.shape = None
         self.position_from_dict = False
         self.orientation_from_dict = False
         self.color = config_elem.get("color","gray")
@@ -31,23 +29,14 @@ class Entity:
     def get_name(self):
         return self.entity_type+"_"+str(self._id)
 
-    def get_shape_type(self):
-        return self.shape_type
-
     def get_position_from_dict(self):
         return self.position_from_dict
     
     def get_orientation_from_dict(self):
         return self.orientation_from_dict
 
-    def get_shape(self):
-        return self.shape
-
     def reset(self):
         pass
-
-    def close(self):
-        del self.shape
 
     def entity(self) -> str:
         return self.entity_type
@@ -61,15 +50,6 @@ class Object(Entity):
             if config_elem.get("_id") == "idle":
                 self.color = config_elem.get("color","black")
         else: raise ValueError(f"Invalid object type: {self.entity_type}")
-        if config_elem.get("shape") in ("circle","square","rectangle"):
-            self.entity_type += "_"+str(config_elem.get("shape"))
-            self.shape_type = "flat"
-            self.shape = Shape3DFactory.create_shape("object",config_elem.get("shape","point"), {key:val for key,val in config_elem.items()}) if self.shape_type != None else None
-        elif config_elem.get("shape") in ("sphere","cube","cuboid","cylinder"):
-            self.entity_type += "_"+str(config_elem.get("shape"))
-            self.shape_type = "dense"
-            self.shape = Shape3DFactory.create_shape("object",config_elem.get("shape","point"), {key:val for key,val in config_elem.items()}) if self.shape_type != None else None
-        else: raise ValueError(f"Invalid object type: {self.entity_type}")
         logging.info(f"Object {self.entity_type} id {self._id} intialized")
 
 class Agent(Entity):
@@ -77,9 +57,6 @@ class Agent(Entity):
         super().__init__(entity_type,config_elem,_id)
         self.ticks_per_second = config_elem.get("ticks_per_second",31)
         self.color = config_elem.get("color","blue")
-        if config_elem.get("shape") in ("sphere","cube","cuboid","cylinder"):
-            self.shape_type = "dense"
-            self.shape = Shape3DFactory.create_shape("agent",config_elem.get("shape","point"), {key:val for key,val in config_elem.items()}) if self.shape_type != None else None
         logging.info(f"Agent {self.entity_type} id {self._id} intialized")
     
     def ticks(self): return self.ticks_per_second
@@ -89,14 +66,22 @@ class Agent(Entity):
 
     def run(self,arena_shape):
         pass
-    
+
 class StaticObject(Object):
     def __init__(self,entity_type:str, config_elem:dict,_id:int=0):
         super().__init__(entity_type,config_elem,_id)
+        if config_elem.get("shape") in ("circle","square","rectangle"):
+            self.entity_type = entity_type + "_"+str(config_elem.get("shape"))
+            self.shape_type = "flat"
+        elif config_elem.get("shape") in ("sphere","cube","cuboid","cylinder"):
+            self.entity_type = entity_type + "_"+str(config_elem.get("shape"))
+            self.shape_type = "dense"
+        else: raise ValueError(f"Invalid object type: {self.entity_type}")
+        self.shape = Shape3DFactory.create_shape("object",config_elem.get("shape","point"), {key:val for key,val in config_elem.items()})
         self.position = Vector3D()
         self.orientation = Vector3D()
-        self.start_position = None
-        self.start_orientation = None
+        self.start_position = Vector3D()
+        self.start_orientation = Vector3D()
         self.position_from_dict = False
         self.orientation_from_dict = False
         temp_position = config_elem.get("position", None)
@@ -152,14 +137,26 @@ class StaticObject(Object):
 
     def get_orientation(self):
         return self.orientation
+    
+    def close(self):
+        del self.shape
+
+    def get_shape(self):
+        return self.shape
+
+    def get_shape_type(self):
+        return self.shape_type
     
 class StaticAgent(Agent):
     def __init__(self,entity_type:str, config_elem:dict,_id:int=0):
         super().__init__(entity_type,config_elem,_id)
+        if config_elem.get("shape") in ("sphere","cube","cuboid","cylinder"):
+            self.shape_type = "dense"
+        self.shape = Shape3DFactory.create_shape("agent",config_elem.get("shape","point"), {key:val for key,val in config_elem.items()})
         self.position = Vector3D()
         self.orientation = Vector3D()
-        self.start_position = None
-        self.start_orientation = None
+        self.start_position = Vector3D()
+        self.start_orientation = Vector3D()
         self.position_from_dict = False
         self.orientation_from_dict = False
         temp_position = config_elem.get("position", None)
@@ -216,6 +213,15 @@ class StaticAgent(Agent):
     def get_orientation(self):
         return self.orientation
 
+    def close(self):
+        del self.shape
+
+    def get_shape(self):
+        return self.shape
+
+    def get_shape_type(self):
+        return self.shape_type
+    
 class MovableObject(StaticObject):
     def __init__(self,entity_type:str, config_elem:dict,_id:int=0):
         super().__init__(entity_type,config_elem,_id)
@@ -238,8 +244,8 @@ class MovableAgent(StaticAgent):
         self.orientation = self.orientation + delta_orientation
         self.shape.rotate_z(delta_orientation.z)
         forward_vector = Vector3D(self.max_absolute_velocity * -math.sin(math.radians(self.orientation.z)),
-                                  self.max_absolute_velocity * math.cos(math.radians(self.orientation.z)),
-                                  0)
+                                self.max_absolute_velocity * math.cos(math.radians(self.orientation.z)),
+                                0)
         self.position = self.position + forward_vector
         self.shape.translate(self.position)
         overlap = self.shape.check_overlap(arena_shape)
@@ -256,20 +262,21 @@ class MovableAgent(StaticAgent):
         if arena_shape._id == "circle":
             # Per un'arena circolare, la normale è il vettore dal centro dell'arena al centro dell'agente
             normal_vector = collision_point - arena_shape.center
-            return normal_vector.normalize()
+
+            return normal_vector.normalize()*self.max_absolute_velocity
 
         else:
             # Per un'arena rettangolare, calcola la normale in base al lato colpito
-            min_x, max_x = arena_shape.min_vert_x(), arena_shape.max_vert_x()
-            min_y, max_y = arena_shape.min_vert_y(), arena_shape.max_vert_y()
+            min_v = arena_shape.min_vert()
+            max_v = arena_shape.max_vert()
 
-            if collision_point.x <= min_x:
+            if collision_point.x <= min_v.x:
                 return Vector3D(self.max_absolute_velocity, 0, 0)  # Normale verso sinistra
-            elif collision_point.x >= max_x:
+            elif collision_point.x >= max_v.x:
                 return Vector3D(-self.max_absolute_velocity, 0, 0)  # Normale verso destra
-            elif collision_point.y <= min_y:
+            elif collision_point.y <= min_v.y:
                 return Vector3D(0, self.max_absolute_velocity, 0)  # Normale verso il basso
-            elif collision_point.y >= max_y:
+            elif collision_point.y >= max_v.y:
                 return Vector3D(0, -self.max_absolute_velocity, 0)  # Normale verso l'alto
 
         return Vector3D(0, 0, 0)
