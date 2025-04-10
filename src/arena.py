@@ -1,4 +1,4 @@
-import logging, time, gc
+import logging, gc, multiprocessing
 from config import Config
 from random import Random
 from bodies.shapes3D import Shape3DFactory
@@ -30,7 +30,7 @@ class Arena():
         self.shape = None
         if self._id != "none":
             self.shape = Shape3DFactory.create_shape("arena",self._id, {key:val for key,val in config_elem.arena.items()})
-        self.objects = {object_type: (config_elem.environment.get("objects").get(object_type),[]) for object_type in config_elem.environment.get("objects").keys()}
+        self.objects = {object_type: (config_elem.environment.get("objects",{}).get(object_type),[]) for object_type in config_elem.environment.get("objects",{}).keys()}
         self.agents_shapes = {}
 
     def get_id(self):
@@ -63,7 +63,7 @@ class Arena():
             for n in range(config["number"]):
                 entities.append(EntityFactory.create_entity(entity_type="object_"+key,config_elem=config,_id=n))
                 
-    def run(self,num_runs,time_limit, arena_queue, agents_queue, stopGUI_queue = None, render:bool=False):
+    def run(self,num_runs,time_limit, arena_queue, agents_queue, gui_in_queue, gui_out_queue:multiprocessing.Queue , render:bool=False):
         pass
 
     def reset(self):
@@ -108,18 +108,18 @@ class SolidArena(Arena):
                     while not done and count < 200:
                         done = True
                         entities[n].to_origin()
-                        rand_pos = Vector3D(Random.uniform(self.random_generator,self.shape.min_vert_x(),self.shape.max_vert_x()),\
-                                    Random.uniform(self.random_generator,self.shape.min_vert_y(),self.shape.max_vert_y()),\
+                        rand_pos = Vector3D(Random.uniform(self.random_generator,self.shape.min_vert_x(),self.shape.max_vert_x()),
+                                    Random.uniform(self.random_generator,self.shape.min_vert_y(),self.shape.max_vert_y()),
                                     abs(entities[n].get_shape().min_vert_z())) 
                         entities[n].set_position(rand_pos)
-                        if entities[n].get_shape().check_overlap(self.shape):
+                        if entities[n].get_shape().check_overlap(self.shape)[0]:
                             done = False
                         if done:
                             for m in range(len(entities)):
-                                if entities[n].get_shape_type() == "dense" and entities[m].get_shape_type()=="dense" and m!=n and entities[n].get_shape().check_overlap(entities[m].get_shape()):
+                                if entities[n].get_shape_type() == "dense" and entities[m].get_shape_type()=="dense" and m!=n and entities[n].get_shape().check_overlap(entities[m].get_shape())[0]:
                                     done = False
                                     break
-                                elif entities[n].get_shape_type() == "flat" and entities[m].get_shape_type()=="flat" and m!=n and entities[n].get_shape().check_overlap(entities[m].get_shape()):
+                                elif entities[n].get_shape_type() == "flat" and entities[m].get_shape_type()=="flat" and m!=n and entities[n].get_shape().check_overlap(entities[m].get_shape())[0]:
                                     done = False
                                     break
                         count += 1
@@ -157,7 +157,7 @@ class SolidArena(Arena):
             shapes.update({entities[0].entity():temp})
         return shapes
     
-    def run(self,num_runs,time_limit, arena_queue, agents_queue, gui_in_queue, gui_out_queue = None, render:bool=False):
+    def run(self,num_runs,time_limit, arena_queue, agents_queue, gui_in_queue, gui_out_queue = multiprocessing.Queue, render:bool=False):
         """Function to run the arena in a separate process"""
         ticks_limit = time_limit*self.ticks_per_second + 1
         for run in range(1, num_runs + 1):
@@ -172,6 +172,7 @@ class SolidArena(Arena):
             while agents_queue.qsize() == 0: pass
             data_in = agents_queue.get()
             self.agents_shapes = data_in["agents_shapes"]
+            t_flag = 0
             for t in range(1, ticks_limit):
                 # print(f"arena_ticks {t} {self.ticks_per_second}")
                 arena_data = {
@@ -195,9 +196,9 @@ class SolidArena(Arena):
                         if gui_data["status"] == "end":
                             self.close()
                             break
-                                
+                t_flag = t
                 if ticks_limit > 0 and t >= ticks_limit: break
-            if t < ticks_limit: break
+            if t_flag < ticks_limit: break
             self.increment_seed()
             if run < num_runs:
                 self.reset()
@@ -218,25 +219,25 @@ class SolidArena(Arena):
                     done = False
                     while not done and count < 200:
                         done = True
-                        rand_pos = Vector3D(Random.uniform(self.random_generator,self.shape.min_vert_x(),self.shape.max_vert_x()),\
-                                    Random.uniform(self.random_generator,self.shape.min_vert_y(),self.shape.max_vert_y()),\
+                        rand_pos = Vector3D(Random.uniform(self.random_generator,self.shape.min_vert_x(),self.shape.max_vert_x()),
+                                    Random.uniform(self.random_generator,self.shape.min_vert_y(),self.shape.max_vert_y()),
                                     abs(entities[n].get_shape().min_vert_z())) 
                         entities[n].to_origin()
                         entities[n].set_position(rand_pos)
-                        if entities[n].get_shape().check_overlap(self.shape):
+                        if entities[n].get_shape().check_overlap(self.shape)[0]:
                             done = False
                         if done:
                             for m in range(len(entities)):
-                                if entities[n].get_shape_type() == "dense" and entities[m].get_shape_type()=="dense" and m!=n and entities[n].get_shape().check_overlap(entities[m].get_shape()):
+                                if entities[n].get_shape_type() == "dense" and entities[m].get_shape_type()=="dense" and m!=n and entities[n].get_shape().check_overlap(entities[m].get_shape())[0]:
                                     done = False
                                     break
-                                if entities[n].get_shape_type() == "flat" and entities[m].get_shape_type()=="flat" and m!=n and entities[n].get_shape().check_overlap(entities[m].get_shape()):
+                                if entities[n].get_shape_type() == "flat" and entities[m].get_shape_type()=="flat" and m!=n and entities[n].get_shape().check_overlap(entities[m].get_shape())[0]:
                                     done = False
                                     break
                         if done and entities[n].get_shape_type() == "dense":
-                            for (aconfig,aentities) in self.agents.values():
+                            for (aconfig,aentities) in self.agents_shapes.values():
                                 for an in range(len(aentities)):
-                                    if entities[n].get_shape().check_overlap(aentities[an].get_shape()):
+                                    if entities[n].check_overlap(aentities[an].get_shape())[0]:
                                         done = False
                                         break
                         count += 1

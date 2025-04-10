@@ -1,7 +1,7 @@
 import logging, json
 
 class Config:
-    def __init__(self, config_path: str = None, new_data: dict = None):
+    def __init__(self, config_path: str = "", new_data: dict = {}):
         if config_path:
             self.config_path = config_path
             self.data = self.load_config()
@@ -47,11 +47,11 @@ class Config:
         
         
         # Check required fields in agents
-        num_experiments = None
+        num_experiments = -1
         for agent in agents.values():
             if 'ticks_per_second' not in agent or 'number' not in agent:
                 raise ValueError("Each agent must have 'ticks_per_second' and 'number' fields")
-            if num_experiments is None:
+            if num_experiments == -1:
                 num_experiments = len(agent['number'])
             elif len(agent['number']) != num_experiments:
                 raise ValueError("All agents must have the 'number' field with the same length")
@@ -66,7 +66,7 @@ class Config:
         for obj in objects.values():
             if '_id' not in obj or 'number' not in obj:
                 raise ValueError("Each object must have '_id' and 'number' fields")
-            if num_experiments is None:
+            if num_experiments == -1:
                 num_experiments = len(obj['number'])
             elif len(obj['number']) != num_experiments:
                 raise ValueError("All objects must have the 'number' field with the same length")

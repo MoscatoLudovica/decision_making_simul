@@ -8,8 +8,8 @@ class GuiFactory():
     def create_gui(config_elem:dict,arena_vertices,gui_in_queue,gui_out_arena_queue,gui_out_agents_queue):
         if config_elem.get("_id") in ("2D","abstract"):
             return QApplication([]),GUI_2D(config_elem,arena_vertices,gui_in_queue,gui_out_arena_queue,gui_out_agents_queue)
-        elif config_elem.get("_id") == "3D":
-            return GUI_3D(config_elem,arena_vertices,gui_in_queue,gui_out_arena_queue,gui_out_agents_queue)
+        # elif config_elem.get("_id") == "3D":
+        #     return GUI_3D(config_elem,arena_vertices,gui_in_queue,gui_out_arena_queue,gui_out_agents_queue)
         else:
             raise ValueError(f"Invalid gui type: {config_elem.gui['_id']} valid types are '2D' or '3D'")
 
@@ -146,12 +146,12 @@ class GUI_2D(QWidget):
                     entity_color = QColor(entity.color())  # Use the agent's color
                     self.scene.addPolygon(entity_polygon, QPen(entity_color, 1), QBrush(entity_color))
 
-class GUI_3D():
+# class GUI_3D:
 
-    def __init__(self,config_elem:dict,gui_in_queue,gui_out_arena_queue):
-        if config_elem.get("_id") == "abstract":
-            logging.info("Switching to 2D GUI")
-            GUI_2D(config_elem,gui_in_queue,gui_out_arena_queue)
-        else:
-            self._id = "3D"
-            logging.info("3D GUI created successfully")
+#     def __init__(self, config_elem: dict,arena_vertices,gui_in_queue,gui_out_arena_queue,gui_out_agents_queue):
+#         if config_elem.get("_id") == "abstract":
+#             logging.info("Switching to 2D GUI")
+#             GUI_2D(config_elem,arena_vertices,gui_in_queue,gui_out_arena_queue,gui_out_agents_queue)
+#         else:
+#             self._id = "3D"
+#             logging.info("3D GUI created successfully")

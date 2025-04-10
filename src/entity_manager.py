@@ -1,4 +1,4 @@
-import gc
+import gc, multiprocessing
 from random import Random
 from entity import Agent,StaticAgent,MovableAgent,Object,StaticObject,MovableObject
 from geometry_utils.vector3D import Vector3D
@@ -95,7 +95,7 @@ class EntityManager:
     def close(self,):
         pass
 
-    def run(self,num_runs,time_limit, arena_queue, agents_queue, gui_out_queue = None, render:bool=False):
+    def run(self,num_runs,time_limit, arena_queue, agents_queue, gui_out_queue: multiprocessing.Queue, render:bool=False):
         ticks_per_second = 1
         for (config,entities) in self.agents.values():
             ticks_per_second = entities[0].ticks()
@@ -111,6 +111,7 @@ class EntityManager:
                 "agents_shapes": self.get_agent_shapes()
             }
             agents_queue.put(agents_data)
+            t_flag = 0
             for t in range(1, ticks_limit):
                 while data_in["status"][0]/data_in["status"][1] < t/ticks_per_second:
                     if arena_queue.qsize()>0: data_in = arena_queue.get()
@@ -134,10 +135,11 @@ class EntityManager:
                     if gui_data["status"] == "end":
                         self.close()
                         break
+                t_flag = t
                 if ticks_limit > 0 and t >= ticks_limit: break
-            if t < ticks_limit: break
+            if t_flag < ticks_limit: break
             if run < num_runs:
-                self.reset()
+                self.reset(data_in["random_generator"],data_in["objects_shapes"])
             else: self.close()
         gc.collect()
 

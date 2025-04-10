@@ -21,8 +21,7 @@
         "arenas":{
             "arena_0":{
                 "random_seed": -1,
-                "_id": "circle",
-                "side": 1,
+                "_id": "square",
                 "color": "white"
             }
         },

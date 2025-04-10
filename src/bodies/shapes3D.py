@@ -14,7 +14,7 @@ class Shape3DFactory:
         elif shape_type in ("circle","cylinder"):
             return Cylinder(_object,shape_type,config_elem)
         elif shape_type == "point" or shape_type == "none":
-            return Shape(_object,config_elem)
+            return Shape(config_elem)
         else:
             raise ValueError(f"Unknown shape type: {shape_type}")
 
@@ -32,40 +32,25 @@ class Shape:
 
     def color(self) -> str:
         return self._color
-
-    def volume(self) -> float:
-        pass
-
-    def surface_area(self) -> float:
-        pass
-
+    
     def center_of_mass(self) -> Vector3D:
         return self.center
 
     def vertices(self) -> list:
-        pass
-
-    def translate(self, translation_vector):
-        pass
-
-    def scale(self, scale_factor):
-        pass
-
-    def set_vertices(self):
-        pass
-
+        return self.vertices_list
+    
     def check_overlap(self, _shape):
         for vertex in self.vertices():
             if _shape._object == "arena":
                 if self._is_point_outside_shape(vertex, _shape):
-                    return True
+                    return True, vertex
             else:
                 if self._is_point_inside_shape(vertex, _shape):
-                    return True
+                    return True, vertex
         for vertex in _shape.vertices():
             if self._is_point_inside_shape(vertex, self):
-                return True
-        return False
+                return True, vertex
+        return False, Vector3D()
 
     def _is_point_inside_shape(self, point, shape):
         # This is a placeholder method. The actual implementation will depend on the specific shape.
@@ -151,32 +136,7 @@ class Shape:
         for v in self.vertices_list:
             if v.z > out: out = v.z
         return out
-
-    def get_collision_normal(self, arena_shape):
-        if arena_shape._id == "circle":
-            # Per un'arena circolare, la normale è il vettore dal centro dell'arena al centro dell'agente
-            arena_center = arena_shape.center
-            collision_point = self.center
-            normal_vector = collision_point - arena_center
-            return normal_vector.normalize()
-
-        else:
-            # Per un'arena rettangolare, calcola la normale in base al lato colpito
-            collision_point = self.center
-            min_x, max_x = arena_shape.min_vert_x(), arena_shape.max_vert_x()
-            min_y, max_y = arena_shape.min_vert_y(), arena_shape.max_vert_y()
-
-            if collision_point.x <= min_x:
-                return Vector3D(-1, 0, 0)  # Normale verso sinistra
-            elif collision_point.x >= max_x:
-                return Vector3D(1, 0, 0)  # Normale verso destra
-            elif collision_point.y <= min_y:
-                return Vector3D(0, -1, 0)  # Normale verso il basso
-            elif collision_point.y >= max_y:
-                return Vector3D(0, 1, 0)  # Normale verso l'alto
-
-        return Vector3D(0, 0, 0)
-
+    
 class Sphere(Shape):
     def __init__(self,_object:str,shape_type:str, config_elem:dict, center: Vector3D = Vector3D()):
         super().__init__(config_elem=config_elem, center=center)
@@ -189,9 +149,6 @@ class Sphere(Shape):
 
     def surface_area(self):
         return 4 * math.pi * self.radius ** 2
-
-    def vertices(self):
-        return self.vertices_list
     
     def translate(self, translation_vector):
         self.center = self.center + translation_vector
@@ -208,63 +165,6 @@ class Sphere(Shape):
                 y = self.center.y + self.radius * math.sin(phi) * math.sin(theta)
                 z = self.center.z + self.radius * math.cos(phi)
                 self.vertices_list.append(Vector3D(np.round(x,Shape.rounding), np.round(y,Shape.rounding), np.round(z,Shape.rounding)))
-
-class Cube(Shape):
-    def __init__(self,_object:str,shape_type:str, config_elem:dict, center: Vector3D = Vector3D()):
-        super().__init__(config_elem=config_elem, center=center)
-        self._object = _object
-        self._id = shape_type
-        self.side_length = config_elem.get("side", 1.0)
-        self.set_vertices()
-
-    def volume(self):
-        return self.side_length ** 3
-
-    def surface_area(self):
-        return 6 * self.side_length ** 2
-
-    def vertices(self):
-        return self.vertices_list
-
-    def translate(self, translation_vector):
-        self.center = self.center + translation_vector
-        self.set_vertices()
-
-    def set_vertices(self):
-        half_side = self.side_length * 0.5
-        cx, cy, cz = self.center.x, self.center.y, self.center.z
-        if self._object == "arena":
-            self.vertices_list = [
-                Vector3D(np.round(cx - half_side,Shape.rounding), np.round(cy - half_side,Shape.rounding), 0),
-                Vector3D(np.round(cx + half_side,Shape.rounding), np.round(cy - half_side,Shape.rounding), 0),
-                Vector3D(np.round(cx + half_side,Shape.rounding), np.round(cy + half_side,Shape.rounding), 0),
-                Vector3D(np.round(cx - half_side,Shape.rounding), np.round(cy + half_side,Shape.rounding), 0),
-                Vector3D(np.round(cx - half_side,Shape.rounding), np.round(cy - half_side,Shape.rounding), np.round(self.side_length,Shape.rounding)),
-                Vector3D(np.round(cx + half_side,Shape.rounding), np.round(cy - half_side,Shape.rounding), np.round(self.side_length,Shape.rounding)),
-                Vector3D(np.round(cx + half_side,Shape.rounding), np.round(cy + half_side,Shape.rounding), np.round(self.side_length,Shape.rounding)),
-                Vector3D(np.round(cx - half_side,Shape.rounding), np.round(cy + half_side,Shape.rounding), np.round(self.side_length,Shape.rounding))
-            ]
-        else:
-            if self._id in Shape.flat_shapes:
-                self.center.z = 0
-                self.vertices_list = [
-                    Vector3D(np.round(cx - half_side,Shape.rounding), np.round(cy - half_side,Shape.rounding), 0),
-                    Vector3D(np.round(cx + half_side,Shape.rounding), np.round(cy - half_side,Shape.rounding), 0),
-                    Vector3D(np.round(cx + half_side,Shape.rounding), np.round(cy + half_side,Shape.rounding), 0),
-                    Vector3D(np.round(cx - half_side,Shape.rounding), np.round(cy + half_side,Shape.rounding), 0)
-                ]
-            else:
-                self.vertices_list = [
-                    Vector3D(np.round(cx - half_side,Shape.rounding), np.round(cy - half_side,Shape.rounding), np.round(cz - half_side,Shape.rounding)),
-                    Vector3D(np.round(cx + half_side,Shape.rounding), np.round(cy - half_side,Shape.rounding), np.round(cz - half_side,Shape.rounding)),
-                    Vector3D(np.round(cx + half_side,Shape.rounding), np.round(cy + half_side,Shape.rounding), np.round(cz - half_side,Shape.rounding)),
-                    Vector3D(np.round(cx - half_side,Shape.rounding), np.round(cy + half_side,Shape.rounding), np.round(cz - half_side,Shape.rounding)),
-                    Vector3D(np.round(cx - half_side,Shape.rounding), np.round(cy - half_side,Shape.rounding), np.round(cz + half_side,Shape.rounding)),
-                    Vector3D(np.round(cx + half_side,Shape.rounding), np.round(cy - half_side,Shape.rounding), np.round(cz + half_side,Shape.rounding)),
-                    Vector3D(np.round(cx + half_side,Shape.rounding), np.round(cy + half_side,Shape.rounding), np.round(cz + half_side,Shape.rounding)),
-                    Vector3D(np.round(cx - half_side,Shape.rounding), np.round(cy + half_side,Shape.rounding), np.round(cz + half_side,Shape.rounding))
-                ]
-
 class Cuboid(Shape):
     def __init__(self,_object:str,shape_type:str, config_elem:dict, center: Vector3D = Vector3D()):
         super().__init__(config_elem=config_elem, center=center)
@@ -273,18 +173,15 @@ class Cuboid(Shape):
         self.width = config_elem.get("width", 1.0)
         self.height = config_elem.get("height", 1.0)
         self.depth = config_elem.get("depth", 1.0)
-        if config_elem.get("side", None) is not None :
-            self.width,self.height, self.depth = config_elem.get("side"),config_elem.get("side"),config_elem.get("side")
         self.set_vertices()
 
     def volume(self):
-        return self.width * self.height * self.depth
+        if self._id in Shape.flat_shapes: return self.width * self.depth
+        else: return self.width * self.height * self.depth
 
     def surface_area(self):
-        return 2 * (self.width * self.height + self.height * self.depth + self.depth * self.width)
-
-    def vertices(self):
-        return self.vertices_list
+        if self._id in Shape.flat_shapes: return self.width * self.depth
+        else: return 2 * (self.width * self.height + self.height * self.depth + self.depth * self.width)
 
     def translate(self, translation_vector):
         self.center = self.center + translation_vector
@@ -341,9 +238,6 @@ class Cylinder(Shape):
 
     def surface_area(self):
         return 2 * math.pi * self.radius * (self.radius + self.height)
-
-    def vertices(self):
-        return self.vertices_list
 
     def translate(self, translation_vector):
         self.center = self.center + translation_vector

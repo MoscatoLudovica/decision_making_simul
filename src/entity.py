@@ -25,6 +25,7 @@ class Entity:
         self.shape_type = None
         self.shape = None
         self.position_from_dict = False
+        self.orientation_from_dict = False
         self.color = config_elem.get("color","gray")
     
     def get_name(self):
@@ -63,11 +64,11 @@ class Object(Entity):
         if config_elem.get("shape") in ("circle","square","rectangle"):
             self.entity_type += "_"+str(config_elem.get("shape"))
             self.shape_type = "flat"
-            self.shape = Shape3DFactory.create_shape("object",config_elem.get("shape"), {key:val for key,val in config_elem.items()}) if self.shape_type != None else None
+            self.shape = Shape3DFactory.create_shape("object",config_elem.get("shape","point"), {key:val for key,val in config_elem.items()}) if self.shape_type != None else None
         elif config_elem.get("shape") in ("sphere","cube","cuboid","cylinder"):
             self.entity_type += "_"+str(config_elem.get("shape"))
             self.shape_type = "dense"
-            self.shape = Shape3DFactory.create_shape("object",config_elem.get("shape"), {key:val for key,val in config_elem.items()}) if self.shape_type != None else None
+            self.shape = Shape3DFactory.create_shape("object",config_elem.get("shape","point"), {key:val for key,val in config_elem.items()}) if self.shape_type != None else None
         else: raise ValueError(f"Invalid object type: {self.entity_type}")
         logging.info(f"Object {self.entity_type} id {self._id} intialized")
 
@@ -75,11 +76,10 @@ class Agent(Entity):
     def __init__(self,entity_type:str, config_elem: dict,_id:int=0):
         super().__init__(entity_type,config_elem,_id)
         self.ticks_per_second = config_elem.get("ticks_per_second",31)
-        self.random_generator = None
         self.color = config_elem.get("color","blue")
         if config_elem.get("shape") in ("sphere","cube","cuboid","cylinder"):
             self.shape_type = "dense"
-            self.shape = Shape3DFactory.create_shape("agent",config_elem.get("shape"), {key:val for key,val in config_elem.items()}) if self.shape_type != None else None
+            self.shape = Shape3DFactory.create_shape("agent",config_elem.get("shape","point"), {key:val for key,val in config_elem.items()}) if self.shape_type != None else None
         logging.info(f"Agent {self.entity_type} id {self._id} intialized")
     
     def ticks(self): return self.ticks_per_second
@@ -87,7 +87,7 @@ class Agent(Entity):
     def set_random_generator(self,randomn_generator):
         self.random_generator = randomn_generator
 
-    def run(self):
+    def run(self,arena_shape):
         pass
     
 class StaticObject(Object):
@@ -228,7 +228,7 @@ class MovableAgent(StaticAgent):
         super().__init__(entity_type,config_elem,_id)
         self.velocity = Vector3D()
         self.max_absolute_velocity = 0.01 / self.ticks_per_second
-        self.max_angular_velocity = 0.01 / self.ticks_per_second
+        self.max_angular_velocity = 45 / self.ticks_per_second
 
     def run(self,arena_shape):
         self.prev_orientation = self.orientation
@@ -242,18 +242,34 @@ class MovableAgent(StaticAgent):
                                   0)
         self.position = self.position + forward_vector
         self.shape.translate(self.position)
-        if self.shape.check_overlap(arena_shape):
+        overlap = self.shape.check_overlap(arena_shape)
+        if overlap[0]:
             # Calculate the normal vector of the arena border at the collision point
-            collision_normal = self.shape.get_collision_normal(arena_shape)
+            collision_normal = self.get_collision_normal(overlap[1],arena_shape)
             
             # Project the velocity vector onto the tangent of the collision surface
-            velocity_projection = self.velocity - collision_normal * (self.velocity.dot(collision_normal))
-            
-            # Adjust orientation to align with the sliding direction
-            slide_angle = math.degrees(math.atan2(velocity_projection.y, velocity_projection.x))
-            self.orientation.z = slide_angle
-            self.shape.rotate_z(self.orientation.z - self.prev_orientation.z)
-            
-            # Update position and orientation based on the projected velocity
+            velocity_projection = collision_normal
             self.position = self.prev_position + velocity_projection
             self.shape.translate(self.position - self.prev_position)
+
+    def get_collision_normal(self,collision_point:Vector3D,arena_shape):
+        if arena_shape._id == "circle":
+            # Per un'arena circolare, la normale è il vettore dal centro dell'arena al centro dell'agente
+            normal_vector = collision_point - arena_shape.center
+            return normal_vector.normalize()
+
+        else:
+            # Per un'arena rettangolare, calcola la normale in base al lato colpito
+            min_x, max_x = arena_shape.min_vert_x(), arena_shape.max_vert_x()
+            min_y, max_y = arena_shape.min_vert_y(), arena_shape.max_vert_y()
+
+            if collision_point.x <= min_x:
+                return Vector3D(self.max_absolute_velocity, 0, 0)  # Normale verso sinistra
+            elif collision_point.x >= max_x:
+                return Vector3D(-self.max_absolute_velocity, 0, 0)  # Normale verso destra
+            elif collision_point.y <= min_y:
+                return Vector3D(0, self.max_absolute_velocity, 0)  # Normale verso il basso
+            elif collision_point.y >= max_y:
+                return Vector3D(0, -self.max_absolute_velocity, 0)  # Normale verso l'alto
+
+        return Vector3D(0, 0, 0)
