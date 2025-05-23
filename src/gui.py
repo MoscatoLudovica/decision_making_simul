@@ -1,26 +1,27 @@
 import logging
 from PySide6.QtWidgets import QApplication, QWidget, QVBoxLayout, QLabel, QGraphicsView, QGraphicsScene
-from PySide6.QtCore import QTimer, Qt, QPointF
+from PySide6.QtCore import QTimer, Qt, QPointF, QRectF
 from PySide6.QtGui import QPolygonF, QColor, QPen, QBrush
 class GuiFactory():
 
     @staticmethod
-    def create_gui(config_elem:dict,arena_vertices,gui_in_queue,gui_out_arena_queue,gui_out_agents_queue):
+    def create_gui(config_elem:dict,arena_vertices,arena_color,gui_in_queue,gui_out_arena_queue,gui_out_agents_queue):
         if config_elem.get("_id") in ("2D","abstract"):
-            return QApplication([]),GUI_2D(config_elem,arena_vertices,gui_in_queue,gui_out_arena_queue,gui_out_agents_queue)
+            return QApplication([]),GUI_2D(config_elem,arena_vertices,arena_color,gui_in_queue,gui_out_arena_queue,gui_out_agents_queue)
         # elif config_elem.get("_id") == "3D":
-        #     return GUI_3D(config_elem,arena_vertices,gui_in_queue,gui_out_arena_queue,gui_out_agents_queue)
+        #     return GUI_3D(config_elem,arena_vertices,arena_color,gui_in_queue,gui_out_arena_queue,gui_out_agents_queue)
         else:
             raise ValueError(f"Invalid gui type: {config_elem.gui['_id']} valid types are '2D' or '3D'")
 
 class GUI_2D(QWidget):
-    def __init__(self, config_elem: dict,arena_vertices,gui_in_queue,gui_out_arena_queue,gui_out_agents_queue):
+    def __init__(self, config_elem: dict,arena_vertices,arena_color,gui_in_queue,gui_out_arena_queue,gui_out_agents_queue):
         super().__init__()
         self._id = "2D"
         self.show_trajectories = config_elem.get("show_trajectories", False)
         self.show_communication = config_elem.get("show_communication", False)
         self.pixels_per_meter = config_elem.get("pixels_per_meter", 50)
         self.arena_vertices = arena_vertices
+        self.arena_color = arena_color
         self.gui_in_queue = gui_in_queue
         self.gui_out_arena_queue = gui_out_arena_queue
         self.gui_out_agents_queue = gui_out_agents_queue
@@ -33,6 +34,7 @@ class GUI_2D(QWidget):
         # Graphics View for arena visualization
         self.view = QGraphicsView()
         self.scene = QGraphicsScene()
+        self.scene.setSceneRect(0, 0, 800, 800)
         self.view.setScene(self.scene)
         self.layout.addWidget(self.view)
         self.setLayout(self.layout)
@@ -105,7 +107,7 @@ class GUI_2D(QWidget):
 
         # Draw the transformed arena
         polygon = QPolygonF(transformed_vertices)
-        self.scene.addPolygon(polygon, QPen(Qt.black, 2), QBrush(QColor(200, 200, 200)))
+        self.scene.addPolygon(polygon, QPen(Qt.black, 2), QBrush(QColor(self.arena_color)))
 
     def update_scene(self):
         self.data_label.setText(f"Time: {self.time}")
@@ -124,10 +126,10 @@ class GUI_2D(QWidget):
                             vertex.y * self.pixels_per_meter + self.offset_y
                         )
                         for vertex in entity.vertices()
-                    ]
+                    ]             
                     entity_polygon = QPolygonF(entity_vertices)
                     entity_color = QColor(entity.color())
-                    self.scene.addPolygon(entity_polygon, QPen(entity_color, 1), QBrush(entity_color))
+                    self.scene.addPolygon(entity_polygon, QPen(entity_color, .1), QBrush(entity_color))
         if self.agents_shapes != None:
             self.scene.setBackgroundBrush(QColor(240, 240, 240))
             for key, entities in self.agents_shapes.items():
@@ -141,14 +143,26 @@ class GUI_2D(QWidget):
                     ]
                     entity_polygon = QPolygonF(entity_vertices)
                     entity_color = QColor(entity.color())
-                    self.scene.addPolygon(entity_polygon, QPen(entity_color, 1), QBrush(entity_color))
+                    self.scene.addPolygon(entity_polygon, QPen(entity_color, .1), QBrush(entity_color))
+                    entity_attachments = entity.get_attachments()
+                    for attachment in entity_attachments:
+                        attachment_vertices = [
+                            QPointF(
+                                vertex.x * self.pixels_per_meter + self.offset_x,
+                                vertex.y * self.pixels_per_meter + self.offset_y
+                            )
+                            for vertex in attachment.vertices()
+                        ]
+                        attachment_polygon = QPolygonF(attachment_vertices)
+                        attachment_color = QColor(attachment.color())
+                        self.scene.addPolygon(attachment_polygon, QPen(attachment_color, 1), QBrush(attachment_color))       
 
 # class GUI_3D:
 
-#     def __init__(self, config_elem: dict,arena_vertices,gui_in_queue,gui_out_arena_queue,gui_out_agents_queue):
+#     def __init__(self, config_elem: dict,arena_vertices,arena_color,gui_in_queue,gui_out_arena_queue,gui_out_agents_queue):
 #         if config_elem.get("_id") == "abstract":
 #             logging.info("Switching to 2D GUI")
-#             GUI_2D(config_elem,arena_vertices,gui_in_queue,gui_out_arena_queue,gui_out_agents_queue)
+#             GUI_2D(config_elem,arena_vertices,arena_color,gui_in_queue,gui_out_arena_queue,gui_out_agents_queue)
 #         else:
 #             self._id = "3D"
 #             logging.info("3D GUI created successfully")

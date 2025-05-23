@@ -2,10 +2,10 @@
     "environment":{
         "parallel_experiments": false,
         "ticks_per_second": 10,
-        "time_limit": 60,
+        "time_limit": 0,
         "num_runs": 1,
         "render": true,
-        "auto_close_gui": false,
+        "auto_close_gui": true,
         "results":{
             "_id": "basic",
             "save": true,
@@ -16,29 +16,26 @@
             "_id": "2D",
             "show_trajectories": false,
             "show_communication": false,
-            "pixels_per_meter": 300
+            "pixels_per_meter": 100
         },
         "arenas":{
             "arena_0":{
-                "random_seed": -1,
-                "_id": "square",
-                "color": "white"
+                "random_seed": 874,
+                "width": 0.5,
+                "depth": 0.5,
+                "_id": "rectangle",
+                "color": "gray"
             }
         },
         "objects":{
-            "static_0":{
-                "_id": "interactive",
-                "number": [1],
-                "shape": "circle",
-                "diameter": 0.2,
-                "color": "green"
-            }
         },
         "agents":{
             "movable_0":{
+                "levy_exponent":0.8,
+                "crw_exponent":1.8,
+                "moving_behavior":"random_way_point",
                 "ticks_per_second": 31,
-                "number": [3],
-                "position":[[0,0,0]],
+                "number": [8],
                 "shape": "cylinder",
                 "height": 0.02,
                 "diameter": 0.033,

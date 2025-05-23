@@ -1,3 +1,4 @@
+import sys
 import logging,multiprocessing,psutil
 from config import Config
 from entity import EntityFactory
@@ -49,9 +50,9 @@ class SingleProcessEnvironment(Environment):
                 entities.append(EntityFactory.create_entity(entity_type="agent_"+key,config_elem=config,_id=n))
         return agents
 
-    def run_gui(self, config, arena_vertices,gui_in_queue,gui_out_arena_queue,gui_out_agents_queue):
+    def run_gui(self, config, arena_vertices, arena_color,gui_in_queue,gui_out_arena_queue,gui_out_agents_queue):
         """Function to run the GUI in a separate process"""
-        app,gui = GuiFactory.create_gui(config,arena_vertices,gui_in_queue,gui_out_arena_queue,gui_out_agents_queue)
+        app,gui = GuiFactory.create_gui(config,arena_vertices,arena_color,gui_in_queue,gui_out_arena_queue,gui_out_agents_queue)
         gui.show()
         app.exec()
 
@@ -74,7 +75,7 @@ class SingleProcessEnvironment(Environment):
             if self.render[0]:
                 self.arena_shape = exp.arena.get("_id")
                 self.render[1]["_id"] = "abstract" if self.arena_shape in (None, "none") else self.gui_id
-                gui_process = multiprocessing.Process(target=self.run_gui, args=(self.render[1],arena.get_shape().vertices(),gui_in_queue,gui_out_arena_queue,gui_out_agents_queue))
+                gui_process = multiprocessing.Process(target=self.run_gui, args=(self.render[1],arena.get_shape().vertices(),arena.get_shape().color(),gui_in_queue,gui_out_arena_queue,gui_out_agents_queue))
                 gui_process.start()
                 killed = 0  
                 while gui_process.is_alive():
@@ -94,6 +95,13 @@ class SingleProcessEnvironment(Environment):
                         agents_process.join()
                         gui_process.terminate()
                         gui_process.join()
+                    # except Exception as e:
+                    #     if arena_process.exitcode not in (None, 0):
+                    #         logging.error(f"Arena process exited with code {arena_process.exitcode}: {e}")
+                    #     if agents_process.exitcode not in (None, 0):
+                    #         logging.error(f"Agents process exited with code {agents_process.exitcode}: {e}")
+                    #     if self.render[0] and gui_process.exitcode not in (None, 0):
+                    #         logging.error(f"GUI process exited with code {gui_process.exitcode}: {e}")
                 if killed == 1: break
             else:
                 # Create and start the arena process
