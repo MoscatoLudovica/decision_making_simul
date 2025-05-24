@@ -1,5 +1,4 @@
 import math
-from random import Random
 from geometry_utils.vector3D import Vector3D
 
 class Shape3DFactory:
@@ -78,7 +77,7 @@ class Shape:
         return False, Vector3D()
 
     def _get_random_point_inside_shape(self, random_generator, arena_shape):
-        if isinstance(arena_shape, Cylinder) or isinstance(arena_shape, Sphere):
+        if isinstance(arena_shape, (Cylinder,Sphere)):
             # Generate a random point inside the circle (base of the cylinder)
             angle = random_generator.uniform(0, 2 * math.pi)
             r = arena_shape.radius * math.sqrt(random_generator.uniform(0, 1)) 
@@ -89,7 +88,7 @@ class Shape:
         else:
             min_v = arena_shape.min_vert()
             max_v = arena_shape.max_vert()
-            if isinstance(self, Cylinder) or isinstance(self, Sphere):
+            if isinstance(self, (Cylinder,Sphere)):
                 tmp = self.get_radius()
                 min_v += Vector3D(tmp, tmp, tmp)
                 max_v -= Vector3D(tmp, tmp, tmp)
@@ -243,7 +242,7 @@ class Cylinder(Shape):
 
     def set_vertices(self):
         self.vertices_list = []
-        num_vertices = 36
+        num_vertices = 20
         angle_increment = 2 * math.pi / num_vertices
         if self._object == "arena":
             for i in range(num_vertices):
@@ -255,7 +254,7 @@ class Cylinder(Shape):
                 self.vertices_list.append(Vector3D(x, y, z1))
                 self.vertices_list.append(Vector3D(x, y, z2))
         else:
-            num_vertices = 8 if self._object == "mark" else 18
+            num_vertices = 8 if self._object == "mark" else 16
             angle_increment = 2 * math.pi / num_vertices
             for i in range(num_vertices):
                 angle = i * angle_increment

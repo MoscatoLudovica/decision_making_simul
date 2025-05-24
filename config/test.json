@@ -21,8 +21,6 @@
         "arenas":{
             "arena_0":{
                 "random_seed": 874,
-                "width": 0.5,
-                "depth": 0.5,
                 "_id": "rectangle",
                 "color": "gray"
             }
@@ -35,7 +33,7 @@
                 "crw_exponent":1.8,
                 "moving_behavior":"random_way_point",
                 "ticks_per_second": 31,
-                "number": [8],
+                "number": [50],
                 "shape": "cylinder",
                 "height": 0.02,
                 "diameter": 0.033,

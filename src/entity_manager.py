@@ -99,8 +99,9 @@ class EntityManager:
     def close(self,):
         pass
 
-    def run(self,num_runs,time_limit, arena_queue:multiprocessing.Queue, agents_queue:multiprocessing.Queue, gui_out_queue: multiprocessing.Queue, render:bool=False):
+    def run(self,num_runs,time_limit, arena_queue:multiprocessing.Queue, agents_queue:multiprocessing.Queue, gui_out_queue: multiprocessing.Queue, dec_agents_in:multiprocessing.Queue, dec_agents_out:multiprocessing.Queue, render:bool=False):
         ticks_per_second = 1
+        dec_data_in = {}
         for (config,entities) in self.agents.values():
             ticks_per_second = entities[0].ticks()
             break
@@ -121,19 +122,30 @@ class EntityManager:
                     if arena_queue.qsize()>0: data_in = arena_queue.get()
                     agents_data = {
                         "status": [t,ticks_per_second],
-                        "agents_shapes": self.get_agent_shapes(),
+                        "agents_shapes": self.get_agent_shapes()
                     }
                     if agents_queue.qsize() == 0: agents_queue.put(agents_data)
                 if arena_queue.qsize()>0: data_in = arena_queue.get()
                 for _,entities in self.agents.values():
                     for n in range(len(entities)):
-                        entities[n].run(t,self.arena_shape,self.agents) # invoke the run method in a thread
+                        entities[n].run(t,self.arena_shape) # invoke the run method in a thread
                 # print(f"agents_ticks {t} {ticks_per_second}")
                 agents_data = {
                     "status": [t,ticks_per_second],
-                    "agents_shapes": self.get_agent_shapes(),
+                    "agents_shapes": self.get_agent_shapes()
+                }
+                detector_data = {
+                    "agents": self.pack_detector_data()
                 }
                 agents_queue.put(agents_data)
+                dec_agents_in.put(detector_data)
+                dec_data_in = dec_agents_out.get()
+                for _,entities in self.agents.values():
+                    pos = dec_data_in.get(entities[0].entity())
+                    for n in range(len(entities)):
+                        po = pos[n] if pos != None else None
+                        entities[n].post_step(po)
+
                 if render and gui_out_queue.qsize() > 0:
                     gui_data = gui_out_queue.get()
                     if gui_data["status"] == "end":
@@ -147,24 +159,23 @@ class EntityManager:
             else: self.close()
         gc.collect()
 
-    def get_agent_positions(self) -> dict:
-        positions = {}
+    def pack_detector_data(self) -> dict:
+        out = {}
         for _,entities in self.agents.values():
-            temp = []
+            shapes = []
+            velocities = []
+            vectors = []
+            positions = []
+            names = []
             for n in range(len(entities)):
-                temp.append(entities[n].get_position())
-            positions.update({entities[0].entity():temp})
-        return positions
-
-    def get_agent_orientations(self) -> dict:
-        orientations = {}
-        for _,entities in self.agents.values():
-            temp = []
-            for n in range(len(entities)):
-                temp.append(entities[n].get_orientation())
-            orientations.update({entities[0].entity():temp})
-        return orientations
-
+                shapes.append(entities[n].get_shape())
+                velocities.append(entities[n].get_max_absolute_velocity())
+                vectors.append(entities[n].get_forward_vector())
+                positions.append(entities[n].get_prev_position())
+                names.append(entities[n].get_name())
+            out.update({entities[0].entity():(shapes,velocities,vectors,positions,names)})
+        return out
+    
     def get_agent_shapes(self) -> dict:
         shapes = {}
         for _,entities in self.agents.values():

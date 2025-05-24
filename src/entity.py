@@ -69,7 +69,7 @@ class Agent(Entity):
     def get_random_generator(self):
         return self.random_generator
 
-    def run(self,tick,arena_shape,agents):
+    def run(self,tick,arena_shape):
         pass
 
 class StaticObject(Object):
@@ -250,9 +250,23 @@ class MovableAgent(StaticAgent):
         self.crw_exponent = config_elem.get("crw_exponent",1) # 2 is brownian like motion
         self.levy_exponent = config_elem.get("levy_exponent",0.75) # 0 go straight often
         self.goal_position = None
+        self.prev_orientation = Vector3D()
         self.position = Vector3D()
         self.prev_position = Vector3D()
         self.two_step_position = Vector3D()
+        self.forward_vector = Vector3D()
+    
+    def get_max_absolute_velocity(self):
+        return self.max_absolute_velocity
+    
+    def get_prev_position(self):
+        return self.prev_position
+    
+    def get_prev_orientation(self):
+        return self.prev_orientation
+    
+    def get_forward_vector(self):
+        return self.forward_vector
 
     def set_start_orientation(self,new_orientation:Vector3D):
         super().set_start_orientation(new_orientation)
@@ -293,13 +307,20 @@ class MovableAgent(StaticAgent):
         else:
             self.motion = MovableAgent.FORWARD
 
-    def run(self,tick,arena_shape,agents):
+    def post_step(self,position_correction):
+        if position_correction != None:
+            self.position = position_correction
+            self.shape.translate(self.position)
+            self.shape.translate_attachments(self.orientation.z)
+    
+    def run(self,tick,arena_shape):
         if self.moving_behavior == "random_walk":
             self.random_walk(tick)
         elif self.moving_behavior == "random_way_point":
             self.random_way_point(arena_shape)
         self.two_step_position = self.prev_position
         self.prev_position = self.position
+        self.prev_orientation = self.orientation
         delta_orientation = Vector3D(0,0,0)
         if self.motion == MovableAgent.LEFT:
             delta_orientation = Vector3D(0,0,self.max_angular_velocity)
@@ -307,37 +328,14 @@ class MovableAgent(StaticAgent):
             delta_orientation = Vector3D(0,0,-self.max_angular_velocity)
         self.orientation = self.orientation + delta_orientation
         self.orientation.z = self.orientation.z%360
-        self.shape.rotate(delta_orientation.z)
         angle_rad = math.radians(self.orientation.z)
-        forward_vector = Vector3D(self.max_absolute_velocity * math.cos(angle_rad),
-                                self.max_absolute_velocity * -math.sin(angle_rad),
-                                0)
-        self.position = self.position + forward_vector
+        self.forward_vector = Vector3D(self.max_absolute_velocity * math.cos(angle_rad),
+                                        self.max_absolute_velocity * -math.sin(angle_rad),
+                                        0)
+        self.position = self.position + self.forward_vector
+        self.shape.rotate(delta_orientation.z)
         self.shape.translate(self.position)
         self.shape.translate_attachments(self.orientation.z)
-
-    def get_collision_normal(self,collision_point:Vector3D,shape):
-        if shape._id == "circle":
-            # Per un'arena circolare, la normale è il vettore dal centro dell'arena al centro dell'agente
-            normal_vector = collision_point*-1
-
-            return normal_vector.normalize()*self.max_absolute_velocity
-
-        else:
-            # Per un'arena rettangolare, calcola la normale in base al lato colpito
-            min_v = shape.min_vert()
-            max_v = shape.max_vert()
-
-            if collision_point.x <= min_v.x:
-                return Vector3D(self.max_absolute_velocity, 0, 0)  # Normale verso sinistra
-            elif collision_point.x >= max_v.x:
-                return Vector3D(-self.max_absolute_velocity, 0, 0)  # Normale verso destra
-            elif collision_point.y <= min_v.y:
-                return Vector3D(0, self.max_absolute_velocity, 0)  # Normale verso il basso
-            elif collision_point.y >= max_v.y:
-                return Vector3D(0, -self.max_absolute_velocity, 0)  # Normale verso l'alto
-
-        return Vector3D(0, 0, 0)
 
 def wrapped_cauchy_pp(random_generator,c:float) -> float:
     q = 0.5

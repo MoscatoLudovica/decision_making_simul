@@ -1,6 +1,6 @@
 import logging
 from PySide6.QtWidgets import QApplication, QWidget, QVBoxLayout, QLabel, QGraphicsView, QGraphicsScene
-from PySide6.QtCore import QTimer, Qt, QPointF, QRectF
+from PySide6.QtCore import QTimer, Qt, QPointF
 from PySide6.QtGui import QPolygonF, QColor, QPen, QBrush
 class GuiFactory():
 
