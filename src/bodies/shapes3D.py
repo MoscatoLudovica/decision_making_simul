@@ -101,8 +101,6 @@ class Shape:
                             random_generator.uniform(min_v.z, max_v.z))
     
     def _is_point_inside_shape(self, point, shape):
-        # This is a placeholder method. The actual implementation will depend on the specific shape.
-        # For simplicity, let's assume it checks if a point is inside a bounding box of the shape.
         if isinstance(shape, Cylinder):
             distance = math.sqrt((point.x - shape.center.x) ** 2 +
                                 (point.y - shape.center.y) ** 2 +

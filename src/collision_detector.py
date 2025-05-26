@@ -1,5 +1,4 @@
 import multiprocessing
-import numpy as np
 from geometry_utils.vector3D import Vector3D
 
 class CollisionDetector:
@@ -31,33 +30,25 @@ class CollisionDetector:
                                 dname = dnames[m]
                                 delta = Vector3D(position.x-dposition.x,position.y-dposition.y,0)
                                 distance = shape.get_radius() + dshape.get_radius()
-                                if name != dname and delta.magnitude()<=distance:
+                                actual_distance = delta.magnitude()
+                                if name != dname and actual_distance <= distance:
                                     overlap = shape.check_overlap(dshape)
                                     if overlap[0]:
                                         if correction == None: correction = position
                                         collision_normal = get_collision_normal(overlap[1], dshape, max_velocity)
-                                        # Nuova logica: considera anche la velocità e direzione dell'altro agente
-                                        correction = correction + collision_normal - forward_vector + dforward_vector
-
+                                        velocity_projection = collision_normal - forward_vector - collision_normal + dforward_vector
+                                        penetration_depth = distance - actual_distance
+                                        separation = delta.normalize() * penetration_depth*.1
+                                        correction = correction + velocity_projection + separation
                         overlap = shape.check_overlap(self.arena_shape)
                         if overlap[0]:
                             if correction == None: correction = position
                             collision_normal = get_collision_normal(overlap[1],self.arena_shape,max_velocity)
                             velocity_projection = collision_normal - forward_vector
                             correction = correction + velocity_projection
-                        if correction != None:
-                            for _,(dshapes,dvelocities,dvectors,dpositions,dnames) in agents.items():
-                                for m in range(len(dshapes)):
-                                    dshape = dshapes[m] 
-                                    dname = dnames[m]
-                                    dposition = dpositions[m]
-                                    delta = Vector3D(position.x-dposition.x,position.y-dposition.y,0)
-                                    distance = shape.get_radius() + dshape.get_radius()
-                                    if name != dname and delta.magnitude()<=distance:
-                                        shape.translate(correction)
-                                        overlap = shape.check_overlap(dshape)
-                                        if overlap[0]: correction=position
-
+                            shape.translate(correction)
+                            overlap = shape.check_overlap(self.arena_shape)
+                            if overlap[0]: correction = position + velocity_projection
                         out_tmp[n] = correction
                     out.update({k:out_tmp})
                 dec_agents_out.put(out)
@@ -69,14 +60,14 @@ def get_collision_normal(collision_point:Vector3D,shape,max_absolute_velocity:fl
     else:
         min_v = shape.min_vert()
         max_v = shape.max_vert()
+        tmp_x, tmp_y = 0,0
         if collision_point.x <= min_v.x:
-            return Vector3D(max_absolute_velocity, 0, 0)
+            tmp_x = max_absolute_velocity
         elif collision_point.x >= max_v.x:
-            return Vector3D(-max_absolute_velocity, 0, 0)
-        elif collision_point.y <= min_v.y:
-            return Vector3D(0, max_absolute_velocity, 0)
+            tmp_x = -max_absolute_velocity
+        if collision_point.y <= min_v.y:
+            tmp_y =  max_absolute_velocity
         elif collision_point.y >= max_v.y:
-            return Vector3D(0, -max_absolute_velocity, 0)
-
-    return Vector3D(0, 0, 0)
+            tmp_y = -max_absolute_velocity
+        return Vector3D(tmp_x, tmp_y, 0)
     

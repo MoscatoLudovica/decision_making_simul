@@ -253,7 +253,7 @@ class MovableAgent(StaticAgent):
         self.prev_orientation = Vector3D()
         self.position = Vector3D()
         self.prev_position = Vector3D()
-        self.two_step_position = Vector3D()
+        self.prev_goal_distance = 0
         self.forward_vector = Vector3D()
     
     def get_max_absolute_velocity(self):
@@ -290,16 +290,16 @@ class MovableAgent(StaticAgent):
                 self.turning_ticks = int(angle * self.max_turning_ticks)
 
     def random_way_point(self,arena_shape):
-        distance = self.position - self.two_step_position
-        if abs(distance.magnitude()) <= self.max_absolute_velocity:
-            self.last_motion_tick += 1
-        if self.last_motion_tick > self.ticks_per_second*.5:
-            self.last_motion_tick = 0
-            self.goal_position = None
-            return 
         if self.goal_position == None or math.sqrt((self.position.x - self.goal_position.x)**2 + (self.position.y - self.goal_position.y)**2) <= .001:
             self.goal_position = self.shape._get_random_point_inside_shape(self.random_generator, arena_shape)
         angle_to_goal = normalize_angle((math.atan2(self.position.y - self.goal_position.y, self.position.x - self.goal_position.x)/math.pi)*180 + self.orientation.z)
+        distance = self.position - self.goal_position
+        if abs(distance.magnitude()) >= self.prev_goal_distance:
+            self.last_motion_tick += 1
+        self.prev_goal_distance = distance.magnitude()
+        if self.last_motion_tick > self.ticks_per_second*.5:
+            self.last_motion_tick = 0
+            self.goal_position = None
         if angle_to_goal >= self.max_angular_velocity:
             self.motion = MovableAgent.LEFT
         elif angle_to_goal <= -self.max_angular_velocity:
@@ -318,7 +318,6 @@ class MovableAgent(StaticAgent):
             self.random_walk(tick)
         elif self.moving_behavior == "random_way_point":
             self.random_way_point(arena_shape)
-        self.two_step_position = self.prev_position
         self.prev_position = self.position
         self.prev_orientation = self.orientation
         delta_orientation = Vector3D(0,0,0)
