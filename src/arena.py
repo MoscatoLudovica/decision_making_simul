@@ -61,6 +61,7 @@ class Arena():
         pass
 
     def reset(self):
+        self.set_random_seed()
         for (config,entities) in self.objects.values():
             for n in range(len(entities)):
                 entities[n].reset()
@@ -133,33 +134,21 @@ class SolidArena(Arena):
                     position = entities[n].get_start_position()
                     entities[n].set_start_position(Vector3D(position.x,position.y,position.z + abs(entities[n].get_shape().min_vert().z)))
 
-    def get_object_positions(self) -> dict:
-        positions = {}
+    def pack_objects_data(self) -> dict:
+        out = {}
         for _,entities in self.objects.values():
-            temp = []
+            shapes = []
+            positions = []
+            strengths = []
+            uncertainties = []
             for n in range(len(entities)):
-                temp.append(entities[n].get_position())
-            positions.update({entities[0].entity():temp})
-        return positions
-    
-    def get_object_orientations(self) -> dict:
-        orientations = {}
-        for _,entities in self.objects.values():
-            temp = []
-            for n in range(len(entities)):
-                temp.append(entities[n].get_orientation())
-            orientations.update({entities[0].entity():temp})
-        return orientations
-    
-    def get_object_shapes(self) -> dict:
-        shapes = {}
-        for _,entities in self.objects.values():
-            temp = []
-            for n in range(len(entities)):
-                temp.append(entities[n].get_shape())
-            shapes.update({entities[0].entity():temp})
-        return shapes
-    
+                shapes.append(entities[n].get_shape())
+                positions.append(entities[n].get_position())
+                strengths.append(entities[n].get_strength())
+                uncertainties.append(entities[n].get_uncertainty())
+            out.update({entities[0].entity():(shapes,positions,strengths,uncertainties)})
+        return out
+        
     def run(self,num_runs,time_limit, arena_queue:multiprocessing.Queue, agents_queue:multiprocessing.Queue, gui_in_queue:multiprocessing.Queue, gui_out_queue:multiprocessing.Queue, render:bool=False):
         """Function to run the arena in a separate process"""
         ticks_limit = time_limit*self.ticks_per_second + 1 if time_limit > 0 else 0
@@ -167,7 +156,7 @@ class SolidArena(Arena):
             logging.info(f"Run number {run} started")
             arena_data = {
                 "status": [0,self.ticks_per_second],
-                "objects_shapes": self.get_object_shapes(),
+                "objects": self.pack_objects_data(),
             }
             if render:
                 gui_in_queue.put({**arena_data, "agents_shapes": self.agents_shapes})
@@ -177,17 +166,19 @@ class SolidArena(Arena):
             self.agents_shapes = data_in["agents_shapes"]
             t = 1
             while True:
-                # print(f"arena_ticks {t} {self.ticks_per_second}")
+                if ticks_limit > 0 and t >= ticks_limit: break
+                if not render:
+                    print(f"\rarena_ticks {t}", end='', flush=True)
                 arena_data = {
                     "status": [t,self.ticks_per_second],
-                    "objects_shapes": self.get_object_shapes(),
+                    "objects": self.pack_objects_data(),
                 }
                 arena_queue.put(arena_data)
                 while data_in["status"][0]/data_in["status"][1] < t/self.ticks_per_second:
                     if agents_queue.qsize()>0: data_in = agents_queue.get()
                     arena_data = {
                         "status": [t,self.ticks_per_second],
-                        "objects_shapes": self.get_object_shapes(),
+                        "objects": self.pack_objects_data(),
                     }
                     if arena_queue.qsize()==0: arena_queue.put(arena_data)
                 if agents_queue.qsize()>0: data_in = agents_queue.get()
@@ -199,13 +190,13 @@ class SolidArena(Arena):
                         if gui_data["status"] == "end":
                             self.close()
                             break
-                if ticks_limit > 0 and t >= ticks_limit: break
                 t += 1
             if t < ticks_limit: break
-            self.increment_seed()
             if run < num_runs:
+                self.increment_seed()
                 self.reset()
-            else: self.close()
+            else:
+                self.close()
         gc.collect()
         
     def reset(self):
@@ -215,8 +206,11 @@ class SolidArena(Arena):
                 entities[n].set_position(Vector3D(999,0,0),False)
         for (config,entities) in self.objects.values():
             for n in range(len(entities)):
+                entities[n].set_start_orientation(entities[n].get_start_orientation())
+                if not entities[n].get_orientation_from_dict():
+                    rand_angle = Random.uniform(self.random_generator,0.0,360.0)
+                    entities[n].set_start_orientation(Vector3D(0,0,rand_angle))
                 position = entities[n].get_start_position()
-                entities[n].to_origin()
                 if not entities[n].get_position_from_dict():
                     count = 0
                     done = False
@@ -224,7 +218,7 @@ class SolidArena(Arena):
                         done = True
                         min_v  = self.shape.min_vert()
                         max_v  = self.shape.max_vert()
-                        rand_pos = Vector3D(Random.uniform(self.random_generator,min_v.y,max_v.y),
+                        rand_pos = Vector3D(Random.uniform(self.random_generator,min_v.x,max_v.x),
                                     Random.uniform(self.random_generator,min_v.y,max_v.y),
                                     abs(entities[n].get_shape().min_vert().z)) 
                         entities[n].to_origin()
@@ -239,23 +233,13 @@ class SolidArena(Arena):
                                 if entities[n].get_shape_type() == "flat" and entities[m].get_shape_type()=="flat" and m!=n and entities[n].get_shape().check_overlap(entities[m].get_shape())[0]:
                                     done = False
                                     break
-                        if done and entities[n].get_shape_type() == "dense":
-                            for (aconfig,aentities) in self.agents_shapes.values():
-                                for an in range(len(aentities)):
-                                    if entities[n].check_overlap(aentities[an].get_shape())[0]:
-                                        done = False
-                                        break
                         count += 1
-                        if done: position = rand_pos
+                        if done: entities[n].set_start_position(rand_pos,False)
                     if not done:
                         raise Exception(f"Impossible to place object {entities[n].entity()} in the arena")
-                    entities[n].set_start_position(position,False)
                 else:
+                    entities[n].to_origin()
                     entities[n].set_start_position(position)                    
-                entities[n].set_start_orientation(entities[n].get_start_orientation())
-                if not entities[n].get_orientation_from_dict():
-                    rand_angle = Random.uniform(self.random_generator,0.0,360.0)
-                    entities[n].set_start_orientation(Vector3D(0,0,rand_angle))
 
     def close(self):
         super().close()

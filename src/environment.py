@@ -48,11 +48,12 @@ class SingleProcessEnvironment(Environment):
         for key,(config,entities) in agents.items():
             for n in range(config["number"]):
                 entities.append(EntityFactory.create_entity(entity_type="agent_"+key,config_elem=config,_id=n))
+        logging.info(f"Agents initialized: {list(agents.keys())}")
         return agents
 
-    def run_gui(self, config, arena_vertices, arena_color,gui_in_queue,gui_out_arena_queue,gui_out_agents_queue):
+    def run_gui(self, config, arena_vertices, arena_color,gui_in_queue):
         """Function to run the GUI in a separate process"""
-        app,gui = GuiFactory.create_gui(config,arena_vertices,arena_color,gui_in_queue,gui_out_arena_queue,gui_out_agents_queue)
+        app,gui = GuiFactory.create_gui(config,arena_vertices,arena_color,gui_in_queue)
         gui.show()
         app.exec()
 
@@ -74,14 +75,14 @@ class SingleProcessEnvironment(Environment):
             detector_process = multiprocessing.Process(target=collision_detector.run, args=(dec_agents_in,dec_agents_out))
             
             # Initialize GUI only if rendering is enabled
+            killed = 0  
             if self.render[0]:
+                self.render[1]["_id"] = "abstract" if arena.get_id() in (None, "none") else self.gui_id
+                gui_process = multiprocessing.Process(target=self.run_gui, args=(self.render[1],arena.get_shape().vertices(),arena.get_shape().color(),gui_in_queue))
+                gui_process.start()
                 if arena.get_id() not in ("abstract", "none", None): detector_process.start()
                 agents_process.start()
                 arena_process.start()
-                self.render[1]["_id"] = "abstract" if arena.get_id() in (None, "none") else self.gui_id
-                gui_process = multiprocessing.Process(target=self.run_gui, args=(self.render[1],arena.get_shape().vertices(),arena.get_shape().color(),gui_in_queue,gui_out_arena_queue,gui_out_agents_queue))
-                gui_process.start()
-                killed = 0  
                 while gui_process.is_alive():
                     if psutil.Process(gui_process.pid).status() == psutil.STATUS_ZOMBIE or psutil.Process(gui_process.pid).status() == psutil.STATUS_DEAD:
                         gui_out_arena_queue.put({"status": "end"})
@@ -91,37 +92,85 @@ class SingleProcessEnvironment(Environment):
                         arena_process.join()
                         if agents_process.is_alive(): agents_process.terminate()
                         agents_process.join()
-                        if detector_process.is_alive(): detector_process.terminate()
-                        detector_process.join()
+                        if detector_process.pid is not None:
+                            if detector_process.is_alive(): detector_process.terminate()
+                            detector_process.join()
                         gui_process.terminate()
                         gui_process.join()
+                    if arena_process.exitcode not in (None, 0):
+                        killed = 1
+                        agents_process.terminate()
+                        gui_process.terminate()
+                        if detector_process.pid is not None:
+                            if detector_process.is_alive(): detector_process.terminate()
+                            detector_process.join()
+                        arena_process.join()
+                        agents_process.join()
+                        gui_process.join()
+                        raise RuntimeError(f"Arena process exited with code {arena_process.exitcode}")
+                    elif agents_process.exitcode not in (None, 0):
+                        killed = 1
+                        arena_process.terminate()
+                        gui_process.terminate()
+                        if detector_process.pid is not None:
+                            if detector_process.is_alive(): detector_process.terminate()
+                            detector_process.join()
+                        arena_process.join()
+                        agents_process.join()
+                        gui_process.join()
+                        raise RuntimeError(f"Agents process exited with code {agents_process.exitcode}")
+                    elif self.render[0] and gui_process.exitcode not in (None, 0):
+                        killed = 1
+                        arena_process.terminate()
+                        agents_process.terminate()
+                        if detector_process.pid is not None:
+                            if detector_process.is_alive(): detector_process.terminate()
+                            detector_process.join()
+                        arena_process.join()
+                        agents_process.join()
+                        gui_process.join()
+                        raise RuntimeError(f"GUI process exited with code {gui_process.exitcode}")
                     if self.auto_close_gui and not arena_process.is_alive():
                         arena_process.join()
-                        if agents_process.is_alive(): agents_process.terminate()
                         agents_process.join()
-                        if detector_process.is_alive(): detector_process.terminate()
-                        detector_process.join()
+                        if detector_process.pid is not None:
+                            if detector_process.is_alive(): detector_process.terminate()
+                            detector_process.join()
                         gui_process.terminate()
                         gui_process.join()
-                    # except Exception as e:
-                    #     if arena_process.exitcode not in (None, 0):
-                    #         logging.error(f"Arena process exited with code {arena_process.exitcode}: {e}")
-                    #     if agents_process.exitcode not in (None, 0):
-                    #         logging.error(f"Agents process exited with code {agents_process.exitcode}: {e}")
-                    #     if self.render[0] and gui_process.exitcode not in (None, 0):
-                    #         logging.error(f"GUI process exited with code {gui_process.exitcode}: {e}")
                 if killed == 1: break
             else:
-                # Create and start the arena process
                 if arena.get_id() not in ("abstract", "none", None): detector_process.start()
                 agents_process.start()
                 arena_process.start()
-                arena_process.join()
-                if agents_process.is_alive(): agents_process.terminate()
-                agents_process.join()
-                if detector_process.is_alive(): detector_process.terminate()
-                detector_process.join()
 
+                while arena_process.exitcode==None and agents_process.exitcode==None:
+                    pass
+                
+                if arena_process.exitcode not in (None, 0):
+                    killed = 1
+                    agents_process.terminate()
+                    if detector_process.pid is not None:
+                        if detector_process.is_alive(): detector_process.terminate()
+                        detector_process.join()
+                    arena_process.join()
+                    agents_process.join()
+                    raise RuntimeError(f"Arena process exited with code {arena_process.exitcode}")
+                elif agents_process.exitcode not in (None, 0):
+                    killed = 1
+                    arena_process.terminate()
+                    if detector_process.pid is not None:
+                        if detector_process.is_alive(): detector_process.terminate()
+                        detector_process.join()
+                    arena_process.join()
+                    agents_process.join()
+                    raise RuntimeError(f"Agents process exited with code {agents_process.exitcode}")
+                if killed == 0:
+                    arena_process.join()
+                    if agents_process.is_alive(): agents_process.terminate()
+                    agents_process.join()
+                    if detector_process.is_alive(): detector_process.terminate()
+                    detector_process.join()
         logging.info("All experiments completed successfully")
 
 class MultiProcessEnvironment(Environment):

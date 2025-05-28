@@ -61,6 +61,11 @@ class EntityManager:
             for n in range(len(entities)):
                 position = entities[n].get_start_position()
                 entities[n].to_origin()
+                entities[n].set_start_position(position)                    
+                entities[n].set_start_orientation(entities[n].get_start_orientation())
+                if not entities[n].get_orientation_from_dict():
+                    rand_angle = Random.uniform(entities[n].get_random_generator(),0.0,360.0)
+                    entities[n].set_start_orientation(Vector3D(0,0,rand_angle))
                 if not entities[n].get_position_from_dict():
                     count = 0
                     done = False
@@ -86,16 +91,11 @@ class EntityManager:
                                         done = False
                                         break
                         count += 1
-                        if done: position = rand_pos
+                        if done: entities[n].set_start_position(rand_pos,False)
                     if not done:
                         raise Exception(f"Impossible to place agent {entities[n].entity()} in the arena")
-                    entities[n].set_start_position(position,False)
-                else:
-                    entities[n].set_start_position(position)                    
-                entities[n].set_start_orientation(entities[n].get_start_orientation())
-                if not entities[n].get_orientation_from_dict():
-                    rand_angle = Random.uniform(entities[n].get_random_generator(),0.0,360.0)
-                    entities[n].set_start_orientation(Vector3D(0,0,rand_angle))
+                entities[n].shape.translate_attachments(entities[n].orientation.z)
+
     def close(self,):
         pass
 
@@ -109,8 +109,11 @@ class EntityManager:
         for run in range(1, num_runs + 1):
             while arena_queue.qsize() == 0: pass
             data_in = arena_queue.get()
+            o_shapes = {}
+            for k, item in data_in["objects"].items():
+                o_shapes.update({k:item[0]})
             if data_in["status"][0]==0:
-                self.initialize(data_in["random_seed"],data_in["objects_shapes"])
+                self.initialize(data_in["random_seed"],o_shapes)
             agents_data = {
                 "status": [0,ticks_per_second],
                 "agents_shapes": self.get_agent_shapes()
@@ -118,6 +121,7 @@ class EntityManager:
             agents_queue.put(agents_data)
             t = 1
             while True:
+                if ticks_limit > 0 and t >= ticks_limit: break
                 while data_in["status"][0]/data_in["status"][1] < t/ticks_per_second:
                     if arena_queue.qsize()>0: data_in = arena_queue.get()
                     agents_data = {
@@ -128,8 +132,10 @@ class EntityManager:
                 if arena_queue.qsize()>0: data_in = arena_queue.get()
                 for _,entities in self.agents.values():
                     for n in range(len(entities)):
-                        entities[n].run(t,self.arena_shape) # invoke the run method in a thread
-                # print(f"agents_ticks {t} {ticks_per_second}")
+                        try:
+                            entities[n].run(t,self.arena_shape,data_in["objects"]) # invoke the run method in a thread
+                        except Exception as e:
+                            raise e
                 agents_data = {
                     "status": [t,ticks_per_second],
                     "agents_shapes": self.get_agent_shapes()
@@ -151,11 +157,10 @@ class EntityManager:
                     if gui_data["status"] == "end":
                         self.close()
                         break
-                if ticks_limit > 0 and t >= ticks_limit: break
                 t += 1
             if t < ticks_limit: break
             if run < num_runs:
-                self.reset(data_in["objects_shapes"])
+                self.reset(o_shapes)
             else: self.close()
         gc.collect()
 
