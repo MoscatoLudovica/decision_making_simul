@@ -21,6 +21,8 @@ class CollisionDetector:
                         position = positions[n]
                         name = names[n]
                         correction = None
+                        contra_move_sum = Vector3D()
+                        contra_norm_sum = Vector3D()
                         for _,(dshapes,dvelocities,dvectors,dpositions,dnames) in agents.items():
                             for m in range(len(dshapes)):
                                 dshape = dshapes[m]
@@ -36,19 +38,22 @@ class CollisionDetector:
                                     if overlap[0]:
                                         if correction == None: correction = position
                                         collision_normal = get_collision_normal(overlap[1], dshape, max_velocity)
-                                        velocity_projection = collision_normal - forward_vector - collision_normal + dforward_vector
+                                        velocity_projection = collision_normal - forward_vector + dforward_vector
+                                        contra_norm_sum += collision_normal
+                                        contra_move_sum += dforward_vector
                                         penetration_depth = distance - actual_distance
                                         separation = delta.normalize() * penetration_depth*.1
                                         correction = correction + velocity_projection + separation
+                        if correction != None:
+                            shape.translate(correction)
                         overlap = shape.check_overlap(self.arena_shape)
                         if overlap[0]:
                             if correction == None: correction = position
                             collision_normal = get_collision_normal(overlap[1],self.arena_shape,max_velocity)
-                            velocity_projection = collision_normal - forward_vector
-                            correction = correction + velocity_projection
-                            shape.translate(correction)
-                            overlap = shape.check_overlap(self.arena_shape)
-                            if overlap[0]: correction = position + velocity_projection
+                            velocity_projection = collision_normal - forward_vector + contra_norm_sum - contra_move_sum
+                            delta_arena = Vector3D(overlap[1].x,overlap[1].y, 0)
+                            separation = delta_arena.normalize()*-.001
+                            correction = correction + velocity_projection + separation
                         out_tmp[n] = correction
                     out.update({k:out_tmp})
                 dec_agents_out.put(out)
