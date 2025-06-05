@@ -19,7 +19,6 @@ class GUI_2D(QWidget):
         self._id = "2D"
         self.show_trajectories = config_elem.get("show_trajectories", False)
         self.show_communication = config_elem.get("show_communication", False)
-        self.pixels_per_meter = config_elem.get("pixels_per_meter", 50)
         self.arena_vertices = arena_vertices
         self.arena_color = arena_color
         self.gui_in_queue = gui_in_queue
@@ -30,6 +29,7 @@ class GUI_2D(QWidget):
         self._layout.addWidget(self.data_label)
         
         # Graphics View for arena visualization
+        self.scale = 1
         self.view = QGraphicsView()
         self.scene = QGraphicsScene()
         self.scene.setSceneRect(0, 0, 800, 800)
@@ -79,30 +79,29 @@ class GUI_2D(QWidget):
         arena_height = max_y - min_y
 
         # Add a margin (e.g., 10% of the arena size)
-        margin_x = arena_width * 0.1
-        margin_y = arena_height * 0.1
+        margin_x = 0.05
+        margin_y = 0.05
 
         # Calculate the scaling factor to fit the arena within the drawing box
-        scale_x = view_width / ((arena_width + 2 * margin_x) * self.pixels_per_meter)
-        scale_y = view_height / ((arena_height + 2 * margin_y) * self.pixels_per_meter)
-        scale = min(scale_x, scale_y)
+        scale_x = view_width / (arena_width + 2 * margin_x)
+        scale_y = view_height / (arena_height + 2 * margin_y)
+        self.scale = min(scale_x, scale_y)
 
         # Update pixels_per_meter to match the new scale
-        self.pixels_per_meter *= scale
 
         # Center the arena in the drawing box
-        offset_x = (view_width - (arena_width + 2 * margin_x) * self.pixels_per_meter) / 2
-        offset_y = (view_height - (arena_height + 2 * margin_y) * self.pixels_per_meter) / 2
+        offset_x = (view_width - (arena_width + 2 * margin_x) * self.scale) / 2
+        offset_y = (view_height - (arena_height + 2 * margin_y) * self.scale) / 2
 
         # Store offsets for use with agents and objects
-        self.offset_x = offset_x - (min_x - margin_x) * self.pixels_per_meter
-        self.offset_y = offset_y - (min_y - margin_y) * self.pixels_per_meter
+        self.offset_x = offset_x - (min_x - margin_x) * self.scale
+        self.offset_y = offset_y - (min_y - margin_y) * self.scale
 
         # Transform the arena vertices
         transformed_vertices = [
             QPointF(
-                v.x * self.pixels_per_meter + self.offset_x,
-                v.y * self.pixels_per_meter + self.offset_y
+                v.x * self.scale + self.offset_x,
+                v.y * self.scale + self.offset_y
             )
             for v in self.arena_vertices
         ]
@@ -124,8 +123,8 @@ class GUI_2D(QWidget):
                 for entity in entities:
                     entity_vertices = [
                         QPointF(
-                            vertex.x * self.pixels_per_meter + self.offset_x,
-                            vertex.y * self.pixels_per_meter + self.offset_y
+                            vertex.x * self.scale + self.offset_x,
+                            vertex.y * self.scale + self.offset_y
                         )
                         for vertex in entity.vertices()
                     ]
@@ -138,8 +137,8 @@ class GUI_2D(QWidget):
                 for entity in entities:
                     entity_vertices = [
                         QPointF(
-                            vertex.x * self.pixels_per_meter + self.offset_x,
-                            vertex.y * self.pixels_per_meter + self.offset_y
+                            vertex.x * self.scale + self.offset_x,
+                            vertex.y * self.scale + self.offset_y
                         )
                         for vertex in entity.vertices()
                     ]
@@ -150,8 +149,8 @@ class GUI_2D(QWidget):
                     for attachment in entity_attachments:
                         attachment_vertices = [
                             QPointF(
-                                vertex.x * self.pixels_per_meter + self.offset_x,
-                                vertex.y * self.pixels_per_meter + self.offset_y
+                                vertex.x * self.scale + self.offset_x,
+                                vertex.y * self.scale + self.offset_y
                             )
                             for vertex in attachment.vertices()
                         ]
