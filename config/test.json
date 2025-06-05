@@ -9,37 +9,56 @@
         "results":{
             "_id": "basic",
             "save": true,
-            "base_path": "../data/"
-            
+            "base_path": "../data/"            
         },
         "gui":{
             "_id": "2D",
             "show_trajectories": false,
-            "show_communication": false,
-            "pixels_per_meter": 100
+            "show_communication": false
         },
         "arenas":{
             "arena_0":{
-                "random_seed": 3,
-                "width": 0.5,
-                "depth": 0.5,
+                "random_seed": 0,
+                "width": 1,
+                "depth": 1,
                 "_id": "rectangle",
                 "color": "gray"
             }
         },
         "objects":{
+            "static_0":{
+                "number": [2],
+                "position": [[-0.4, -0.2, 0],[0.4, -0.2, 0]],
+                "_id": "idle",
+                "shape": "cylinder",
+                "height": 0.2,
+                "diameter": 0.05,
+                "color": "green",
+                "strength": [[5, 5]],
+                "uncertainty": [[0.1]]
+            }
         },
         "agents":{
             "movable_0":{
-                "levy_exponent":0.8,
-                "crw_exponent":1.8,
-                "moving_behavior":"random_way_point",
                 "ticks_per_second": 31,
-                "number": [20],
+                "number": [1],
+                "position": [[0, 0.4, 0]],
                 "shape": "cylinder",
                 "height": 0.02,
                 "diameter": 0.033,
-                "color": "blue"
+                "color": "blue",
+                "detection": "visual",
+                "moving_behavior":"spin_model",
+                "perception_width": [0.1],
+                "num_groups": [16],
+                "num_spins_per_group": [5],
+                "perception_global_inhibition": [0],
+                "T": [0.1],
+                "J": [5],
+                "nu": [0.2],
+                "p_spin_up": [0.5],
+                "time_delay": [0],
+                "dynamics": ["metropolis"]
             }
         }   
     }

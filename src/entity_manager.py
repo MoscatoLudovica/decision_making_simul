@@ -14,6 +14,7 @@ class EntityManager:
         for (config,entities) in self.agents.values():
             for n in range(len(entities)):
                 entities[n].set_random_generator(random_seed)
+                entities[n].reset()
                 if not entities[n].get_orientation_from_dict():
                     rand_angle = Random.uniform(entities[n].get_random_generator(),0.0,360.0)
                     entities[n].set_start_orientation(Vector3D(0,0,rand_angle))
@@ -48,52 +49,9 @@ class EntityManager:
                         raise Exception(f"Impossible to place agent {entities[n].entity()} in the arena")
                     
                 else:
+                    entities[n].to_origin()
                     position = entities[n].get_start_position()
                     entities[n].set_start_position(Vector3D(position.x,position.y,position.z + (abs(entities[n].get_shape().min_vert().z))))
-                entities[n].shape.translate_attachments(entities[n].orientation.z)
-
-    def reset(self,object_shapes):
-        for (config,entities) in self.agents.values():
-            for n in range(len(entities)):
-                entities[n].set_position(Vector3D(999,0,0),False)
-
-        for (config,entities) in self.agents.values():
-            for n in range(len(entities)):
-                position = entities[n].get_start_position()
-                entities[n].to_origin()
-                entities[n].set_start_position(position)                    
-                entities[n].set_start_orientation(entities[n].get_start_orientation())
-                if not entities[n].get_orientation_from_dict():
-                    rand_angle = Random.uniform(entities[n].get_random_generator(),0.0,360.0)
-                    entities[n].set_start_orientation(Vector3D(0,0,rand_angle))
-                if not entities[n].get_position_from_dict():
-                    count = 0
-                    done = False
-                    while not done and count < 500:
-                        done = True
-                        min_v  = self.arena_shape.min_vert()
-                        max_v  = self.arena_shape.max_vert()
-                        rand_pos = Vector3D(Random.uniform(entities[n].get_random_generator(),min_v.x,max_v.x),
-                                            Random.uniform(entities[n].get_random_generator(),min_v.y,max_v.y),
-                                            abs(entities[n].get_shape().min_vert().z)) 
-                        entities[n].to_origin()
-                        entities[n].set_position(rand_pos)
-                        if entities[n].get_shape().check_overlap(self.arena_shape)[0]:
-                            done = False
-                        if done:
-                            for m in range(len(entities)):
-                                if m!=n and entities[n].get_shape().check_overlap(entities[m].get_shape())[0]:
-                                    done = False
-                                    break
-                            for shapes in object_shapes.values():
-                                for m in range(len(shapes)):
-                                    if entities[n].get_shape().check_overlap(shapes[m])[0]:
-                                        done = False
-                                        break
-                        count += 1
-                        if done: entities[n].set_start_position(rand_pos,False)
-                    if not done:
-                        raise Exception(f"Impossible to place agent {entities[n].entity()} in the arena")
                 entities[n].shape.translate_attachments(entities[n].orientation.z)
 
     def close(self,):
@@ -132,10 +90,7 @@ class EntityManager:
                 if arena_queue.qsize()>0: data_in = arena_queue.get()
                 for _,entities in self.agents.values():
                     for n in range(len(entities)):
-                        try:
-                            entities[n].run(t,self.arena_shape,data_in["objects"]) # invoke the run method in a thread
-                        except Exception as e:
-                            raise e
+                        entities[n].run(t,self.arena_shape,data_in["objects"]) # invoke the run method in a thread
                 agents_data = {
                     "status": [t,ticks_per_second],
                     "agents_shapes": self.get_agent_shapes()
@@ -160,7 +115,7 @@ class EntityManager:
                 t += 1
             if t < ticks_limit: break
             if run < num_runs:
-                self.reset(o_shapes)
+                if arena_queue.qsize() > 0: data_in = arena_queue.get()
             else: self.close()
         gc.collect()
 

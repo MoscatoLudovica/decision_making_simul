@@ -52,19 +52,16 @@ class Arena():
             self.random_generator.seed()
 
     def initialize(self):
-        self.set_random_seed()
+        self.reset()
         for key,(config,entities) in self.objects.items():
             for n in range(config["number"]):
                 entities.append(EntityFactory.create_entity(entity_type="object_"+key,config_elem=config,_id=n))
                 
-    def run(self,num_runs,time_limit, arena_queue:multiprocessing.Queue, agents_queue:multiprocessing.Queue, gui_in_queue:multiprocessing.Queue, gui_out_queue:multiprocessing.Queue , render:bool=False):
+    def run(self,num_runs,time_limit, arena_queue:multiprocessing.Queue, agents_queue:multiprocessing.Queue, gui_in_queue:multiprocessing.Queue, gui_out_queue:multiprocessing.Queue ,dec_arena_in:multiprocessing.Queue, render:bool=False):
         pass
 
     def reset(self):
         self.set_random_seed()
-        for (config,entities) in self.objects.values():
-            for n in range(len(entities)):
-                entities[n].reset()
 
     def close(self):
         for (config,entities) in self.objects.values():
@@ -104,17 +101,18 @@ class SolidArena(Arena):
                 if not entities[n].get_orientation_from_dict():
                     rand_angle = Random.uniform(self.random_generator,0.0,360.0)
                     entities[n].set_start_orientation(Vector3D(0,0,rand_angle))
+                position = entities[n].get_start_position()
                 if not entities[n].get_position_from_dict():
                     count = 0
                     done = False
                     while not done and count < 500:
                         done = True
-                        entities[n].to_origin()
                         min_v  = self.shape.min_vert()
                         max_v  = self.shape.max_vert()
                         rand_pos = Vector3D(Random.uniform(self.random_generator,min_v.x,max_v.x),
-                                    Random.uniform(self.random_generator,min_v.y,max_v.y),
-                                    abs(entities[n].get_shape().min_vert().z)) 
+                                            Random.uniform(self.random_generator,min_v.y,max_v.y),
+                                            abs(entities[n].get_shape().min_vert().z)) 
+                        entities[n].to_origin()
                         entities[n].set_position(rand_pos)
                         if entities[n].get_shape().check_overlap(self.shape)[0]:
                             done = False
@@ -131,8 +129,8 @@ class SolidArena(Arena):
                     if not done:
                         raise Exception(f"Impossible to place object {entities[n].entity()} in the arena")
                 else:
-                    position = entities[n].get_start_position()
-                    entities[n].set_start_position(Vector3D(position.x,position.y,position.z + abs(entities[n].get_shape().min_vert().z)))
+                    entities[n].to_origin()
+                    entities[n].set_start_position(Vector3D(position.x,position.y,position.z + (abs(entities[n].get_shape().min_vert().z))))
 
     def pack_objects_data(self) -> dict:
         out = {}
@@ -148,8 +146,19 @@ class SolidArena(Arena):
                 uncertainties.append(entities[n].get_uncertainty())
             out.update({entities[0].entity():(shapes,positions,strengths,uncertainties)})
         return out
+    
+    def pack_detector_data(self) -> dict:
+        out = {}
+        for _,entities in self.objects.values():
+            shapes = []
+            positions = []
+            for n in range(len(entities)):
+                shapes.append(entities[n].get_shape())
+                positions.append(entities[n].get_position())
+            out.update({entities[0].entity():(shapes,positions)})
+        return out
         
-    def run(self,num_runs,time_limit, arena_queue:multiprocessing.Queue, agents_queue:multiprocessing.Queue, gui_in_queue:multiprocessing.Queue, gui_out_queue:multiprocessing.Queue, render:bool=False):
+    def run(self,num_runs,time_limit, arena_queue:multiprocessing.Queue, agents_queue:multiprocessing.Queue, gui_in_queue:multiprocessing.Queue, gui_out_queue:multiprocessing.Queue,dec_arena_in:multiprocessing.Queue, render:bool=False):
         """Function to run the arena in a separate process"""
         ticks_limit = time_limit*self.ticks_per_second + 1 if time_limit > 0 else 0
         for run in range(1, num_runs + 1):
@@ -180,7 +189,13 @@ class SolidArena(Arena):
                         "status": [t,self.ticks_per_second],
                         "objects": self.pack_objects_data(),
                     }
-                    if arena_queue.qsize()==0: arena_queue.put(arena_data)
+                    detector_data = {
+                        "objects": self.pack_detector_data()
+                    }
+                    if arena_queue.qsize()==0:
+                        arena_queue.put(arena_data)
+                        dec_arena_in.put(detector_data)
+
                 if agents_queue.qsize()>0: data_in = agents_queue.get()
                 self.agents_shapes = data_in["agents_shapes"]
                 if render:
@@ -219,8 +234,8 @@ class SolidArena(Arena):
                         min_v  = self.shape.min_vert()
                         max_v  = self.shape.max_vert()
                         rand_pos = Vector3D(Random.uniform(self.random_generator,min_v.x,max_v.x),
-                                    Random.uniform(self.random_generator,min_v.y,max_v.y),
-                                    abs(entities[n].get_shape().min_vert().z)) 
+                                            Random.uniform(self.random_generator,min_v.y,max_v.y),
+                                            abs(entities[n].get_shape().min_vert().z)) 
                         entities[n].to_origin()
                         entities[n].set_position(rand_pos)
                         if entities[n].get_shape().check_overlap(self.shape)[0]:
@@ -239,7 +254,7 @@ class SolidArena(Arena):
                         raise Exception(f"Impossible to place object {entities[n].entity()} in the arena")
                 else:
                     entities[n].to_origin()
-                    entities[n].set_start_position(position)                    
+                    entities[n].set_start_position(Vector3D(position.x,position.y,position.z + (abs(entities[n].get_shape().min_vert().z))))
 
     def close(self):
         super().close()

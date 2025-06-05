@@ -1,7 +1,10 @@
-import math, logging
+import math
+import numpy as np
+# from scipy.special import i0
 from random import Random
 from geometry_utils.vector3D import Vector3D
 from bodies.shapes3D import Shape3DFactory
+from spinsystem import SpinSystem
 class EntityFactory:
     
     @staticmethod
@@ -45,12 +48,8 @@ class Object(Entity):
     def __init__(self,entity_type:str, config_elem: dict,_id:int=0):
         super().__init__(entity_type,config_elem,_id)
         self.color = config_elem.get("color","green")
-        if config_elem.get("_id") in ("idle","interactive"):
-            self.entity_type += "_"+str(config_elem.get("_id"))
-            if config_elem.get("_id") == "idle":
-                self.color = config_elem.get("color","black")
-        else: raise ValueError(f"Invalid object type: {self.entity_type}")
-        logging.info(f"Object {self.entity_type} id {self._id} intialized")
+        if not config_elem.get("_id") in ("idle","interactive"):
+            raise ValueError(f"Invalid object type: {self.entity_type}")
 
 class Agent(Entity):
     def __init__(self,entity_type:str, config_elem: dict,_id:int=0):
@@ -58,7 +57,6 @@ class Agent(Entity):
         self.random_generator = Random()
         self.ticks_per_second = config_elem.get("ticks_per_second",31)
         self.color = config_elem.get("color","blue")
-        logging.info(f"Agent {self.entity_type} id {self._id} intialized")
     
     def ticks(self): return self.ticks_per_second
     
@@ -69,17 +67,15 @@ class Agent(Entity):
     def get_random_generator(self):
         return self.random_generator
 
-    def run(self,tick,arena_shape):
+    def run(self,tick,arena_shape,objects):
         pass
 
 class StaticObject(Object):
     def __init__(self,entity_type:str, config_elem:dict,_id:int=0):
         super().__init__(entity_type,config_elem,_id)
         if config_elem.get("shape") in ("circle","square","rectangle"):
-            self.entity_type = entity_type + "_"+str(config_elem.get("shape"))
             self.shape_type = "flat"
         elif config_elem.get("shape") in ("sphere","cube","cuboid","cylinder"):
-            self.entity_type = entity_type + "_"+str(config_elem.get("shape"))
             self.shape_type = "dense"
         else: raise ValueError(f"Invalid object type: {self.entity_type}")
         self.shape = Shape3DFactory.create_shape("object",config_elem.get("shape","point"), {key:val for key,val in config_elem.items()})
@@ -87,6 +83,18 @@ class StaticObject(Object):
         self.orientation = Vector3D()
         self.start_position = Vector3D()
         self.start_orientation = Vector3D()
+        temp_strength = config_elem.get("strength", None)
+        if temp_strength != None:
+            try:
+                self.strength = temp_strength[_id]
+            except:
+                self.strength = temp_strength[-1]
+        temp_uncertainty = config_elem.get("uncertainty", None)
+        if temp_uncertainty != None:
+            try:
+                self.uncertainty = temp_uncertainty[_id]
+            except:
+                self.uncertainty = temp_uncertainty[-1]
         temp_position = config_elem.get("position", None)
         if temp_position != None:
             self.position_from_dict = True
@@ -94,7 +102,6 @@ class StaticObject(Object):
                 self.start_position = Vector3D(temp_position[_id][0],temp_position[_id][1],temp_position[_id][2])
             except:
                 self.start_position = Vector3D(temp_position[-1][0],temp_position[-1][1],temp_position[-1][2])
-            self.set_start_position(self.start_position)
         temp_orientation = config_elem.get("orientation", None)
         if temp_orientation != None:
             self.orientation_from_dict = True
@@ -103,7 +110,6 @@ class StaticObject(Object):
             except:
                 self.start_orientation = Vector3D(temp_orientation[-1][0],temp_orientation[-1][1],temp_orientation[-1][2])
             self.orientation = self.start_orientation
-            self.set_start_orientation(self.start_orientation)
 
     def to_origin(self):
         self.position = Vector3D()
@@ -138,6 +144,12 @@ class StaticObject(Object):
 
     def get_orientation(self):
         return self.orientation
+    
+    def get_strength(self):
+        return self.strength
+
+    def get_uncertainty(self):
+        return self.uncertainty
         
     def close(self):
         del self.shape
@@ -163,20 +175,17 @@ class StaticAgent(Agent):
         if temp_position != None:
             self.position_from_dict = True
             try:
-                self.start_position = Vector3D(temp_position[_id][0],temp_position[_id][1],temp_position[_id][2])
+                self.start_position = Vector3D(temp_position[0],temp_position[1],temp_position[2])
             except:
                 self.start_position = Vector3D(temp_position[-1][0],temp_position[-1][1],temp_position[-1][2])
-            self.set_start_position(self.start_position)
         temp_orientation = config_elem.get("orientation", None)
         if temp_orientation != None:
             self.orientation_from_dict = True
             try:
-                self.start_orientation = Vector3D(temp_orientation[_id][0],temp_orientation[_id][1],temp_orientation[_id][2])
+                self.start_orientation = Vector3D(temp_orientation[0],temp_orientation[1],temp_orientation[2])
             except:
                 self.start_orientation = Vector3D(temp_orientation[-1][0],temp_orientation[-1][1],temp_orientation[-1][2])
             self.orientation = self.start_orientation
-            self.set_start_orientation(self.start_orientation)
-        self.shape.translate_attachments(self.start_orientation.x)
 
     def to_origin(self):
         self.position = Vector3D()
@@ -224,7 +233,6 @@ class StaticAgent(Agent):
 class MovableObject(StaticObject):
     def __init__(self,entity_type:str, config_elem:dict,_id:int=0):
         super().__init__(entity_type,config_elem,_id)
-        self.velocity = Vector3D()
         # self.max_absolute_velocity = 0.01
         # self.max_angular_velocity = 0.01
 
@@ -237,25 +245,41 @@ class MovableAgent(StaticAgent):
 
     def __init__(self,entity_type:str, config_elem:dict,_id:int=0):
         super().__init__(entity_type,config_elem,_id)
-        self.velocity = Vector3D()
-        self.moving_behavior = config_elem.get("moving_behavior","random_walk")
+        self.config_elem = config_elem
         self.max_absolute_velocity = 0.01 / self.ticks_per_second
         self.max_angular_velocity = 45 / self.ticks_per_second
-        self.max_turning_ticks = 160
-        self.standard_motion_steps = 5*16
-        self.turning_ticks = 0
-        self.forward_ticks = 0
-        self.motion = MovableAgent.STOP
-        self.last_motion_tick = 0
-        self.crw_exponent = config_elem.get("crw_exponent",1) # 2 is brownian like motion
-        self.levy_exponent = config_elem.get("levy_exponent",0.75) # 0 go straight often
+        self.forward_vector = Vector3D()
         self.goal_position = None
         self.prev_orientation = Vector3D()
         self.position = Vector3D()
         self.prev_position = Vector3D()
         self.prev_goal_distance = 0
-        self.forward_vector = Vector3D()
+        self.detection = config_elem.get("detection","GPS")
+        self.moving_behavior = config_elem.get("moving_behavior","random_walk")
+        if self.detection in ("visual"):
+            self.perception_width = config_elem.get("perception_width",0.1)
+            self.num_groups = config_elem.get("num_groups",32)
+            self.num_spins_per_group = config_elem.get("num_spins_per_group",10)
+            self.perception_global_inhibition = config_elem.get("perception_global_inhibition",0)
+            self.group_angles = np.linspace(0, 2*math.pi, self.num_groups, endpoint=False)
+        else:
+            self.max_turning_ticks = 160
+            self.standard_motion_steps = 5*16
+            self.crw_exponent = config_elem.get("crw_exponent",1) # 2 is brownian like motion
+            self.levy_exponent = config_elem.get("levy_exponent",1.75) # 0 go straight often
     
+    def reset(self):
+        if self.detection in ("visual"):
+            self.perception = None
+            self.spin_system = SpinSystem(self.random_generator,self.num_groups, self.num_spins_per_group,self.config_elem.get("T",0.1),
+                                          self.config_elem.get("J",4),self.config_elem.get("nu",0.5),self.config_elem.get("p_spin_up",0.5),
+                                          self.config_elem.get("time_delay",0),self.config_elem.get("dynamics","metropolis"))
+        else:
+            self.turning_ticks = 0
+            self.forward_ticks = 0
+            self.motion = MovableAgent.STOP
+            self.last_motion_tick = 0
+
     def get_max_absolute_velocity(self):
         return self.max_absolute_velocity
     
@@ -264,6 +288,12 @@ class MovableAgent(StaticAgent):
     
     def get_prev_orientation(self):
         return self.prev_orientation
+    
+    def get_position(self):
+        return self.position
+    
+    def get_orientation(self):
+        return self.orientation
     
     def get_forward_vector(self):
         return self.forward_vector
@@ -292,7 +322,11 @@ class MovableAgent(StaticAgent):
     def random_way_point(self,arena_shape):
         if self.goal_position == None or math.sqrt((self.position.x - self.goal_position.x)**2 + (self.position.y - self.goal_position.y)**2) <= .001:
             self.goal_position = self.shape._get_random_point_inside_shape(self.random_generator, arena_shape)
-        angle_to_goal = normalize_angle((math.atan2(self.position.y - self.goal_position.y, self.position.x - self.goal_position.x)/math.pi)*180 + self.orientation.z)
+        # Compute angle from agent to object in world coordinates
+        dx = self.goal_position.x - self.position.x
+        dy = self.goal_position.y - self.position.y
+        angle_to_goal = math.degrees(math.atan2(-dy, dx))
+        angle_to_goal = normalize_angle(angle_to_goal - self.orientation.z)
         distance = self.position - self.goal_position
         if abs(distance.magnitude()) >= self.prev_goal_distance:
             self.last_motion_tick += 1
@@ -313,28 +347,93 @@ class MovableAgent(StaticAgent):
             self.shape.translate(self.position)
             self.shape.translate_attachments(self.orientation.z)
     
-    def run(self,tick,arena_shape):
-        if self.moving_behavior == "random_walk":
-            self.random_walk(tick)
-        elif self.moving_behavior == "random_way_point":
-            self.random_way_point(arena_shape)
-        self.prev_position = self.position
-        self.prev_orientation = self.orientation
-        delta_orientation = Vector3D(0,0,0)
-        if self.motion == MovableAgent.LEFT:
-            delta_orientation = Vector3D(0,0,self.max_angular_velocity)
-        elif self.motion == MovableAgent.RIGHT:
-            delta_orientation = Vector3D(0,0,-self.max_angular_velocity)
-        self.orientation = self.orientation + delta_orientation
-        self.orientation.z = self.orientation.z%360
-        angle_rad = math.radians(self.orientation.z)
-        self.forward_vector = Vector3D(self.max_absolute_velocity * math.cos(angle_rad),
-                                        self.max_absolute_velocity * -math.sin(angle_rad),
-                                        0)
-        self.position = self.position + self.forward_vector
-        self.shape.rotate(delta_orientation.z)
-        self.shape.translate(self.position)
-        self.shape.translate_attachments(self.orientation.z)
+    def update_visual_detection(self,objects):
+        perception = np.zeros(self.num_groups * self.num_spins_per_group)
+        for _,(shapes,positions,strengths,uncertainties) in objects.items():
+            for n in range(len(shapes)):
+                dx = positions[n].x - self.position.x
+                dy = positions[n].y - self.position.y
+                angle_to_object = math.degrees(math.atan2(-dy, dx))
+                angle_to_object = normalize_angle(angle_to_object - self.orientation.z)
+                effective_width = self.perception_width + uncertainties[n]
+                angle_diffs = np.abs(self.group_angles - math.radians(angle_to_object))
+                angle_diffs = np.minimum(angle_diffs, 2*math.pi - angle_diffs)
+                sigma0 = self.perception_width
+                sigma = effective_width
+                if sigma <= 0: sigma = 1e-6
+                weights = (sigma0 / sigma) * np.exp(-(angle_diffs ** 2) / (2 * (sigma**2)))
+                # if kappa[n] <= 0: kappa[n] = 1e-6
+                # weights = np.exp(kappa[n] * np.cos(angle_diffs))
+                # normalization = (2 * np.pi * i0(kappa[n]))
+                # weights /= normalization
+                weights *= strengths[n] #1/math.sqrt(dx**2 + dy**2)
+                perception += np.repeat(weights, self.num_spins_per_group)
+        perception -= self.perception_global_inhibition
+        self.perception = perception
+
+    def run(self,tick,arena_shape,objects):
+        if self.detection == "visual":
+            self.prev_position = self.position
+            self.prev_orientation = self.orientation
+            self.update_visual_detection(objects)
+            self.spin_system.update_external_field(self.perception)
+            self.spin_system.run_simulation(steps=1)
+            angle_rad = self.spin_system.average_direction_of_activity()
+            if angle_rad is not None:
+                angle_deg = normalize_angle(math.degrees(angle_rad))
+                if angle_deg > self.max_angular_velocity:
+                    angle_deg = self.max_angular_velocity
+                elif angle_deg < -self.max_angular_velocity:
+                    angle_deg = -self.max_angular_velocity
+                delta_orientation = Vector3D(0,0,angle_deg)
+                self.orientation = self.orientation + delta_orientation
+                self.orientation.z = normalize_angle(self.orientation.z)
+                angle_rad = math.radians(self.orientation.z)
+                # inv_magnitude = self.spin_system.get_inverse_magnitude_of_activity()
+                # if inv_magnitude is not None and inv_magnitude > 0:
+                #     # Inverse of width could be used as scaling factor
+                #     scaling_factor = 1.0 / inv_magnitude
+                # else:
+                #     scaling_factor = 0.0 
+                width = self.spin_system.get_width_of_activity()
+                if width is not None and width > 0:
+                    # Inverse of width could be used as scaling factor
+                    scaling_factor = 1.0 / width
+                else:
+                    scaling_factor = 0.0 
+                scaling_factor = np.clip(scaling_factor, 0.0, 1.0)
+                self.forward_vector = Vector3D(self.max_absolute_velocity*scaling_factor * math.cos(angle_rad),
+                                                self.max_absolute_velocity*scaling_factor * -math.sin(angle_rad),
+                                                0)
+                self.position = self.position + self.forward_vector
+                self.shape.rotate(delta_orientation.z)
+                self.shape.translate(self.position)
+                self.shape.translate_attachments(self.orientation.z)
+
+        elif self.detection == "GPS":
+            if self.moving_behavior == "random_walk":
+                self.random_walk(tick)
+            elif self.moving_behavior == "random_way_point":
+                self.random_way_point(arena_shape)
+            else:
+                raise ValueError(f"Invalid moving behavior: {self.moving_behavior}")
+            self.prev_position = self.position
+            self.prev_orientation = self.orientation
+            delta_orientation = Vector3D(0,0,0)
+            if self.motion == MovableAgent.LEFT:
+                delta_orientation = Vector3D(0,0,self.max_angular_velocity)
+            elif self.motion == MovableAgent.RIGHT:
+                delta_orientation = Vector3D(0,0,-self.max_angular_velocity)
+            self.orientation = self.orientation + delta_orientation
+            self.orientation.z = normalize_angle(self.orientation.z)
+            angle_rad = math.radians(self.orientation.z)
+            self.forward_vector = Vector3D(self.max_absolute_velocity * math.cos(angle_rad),
+                                            self.max_absolute_velocity * -math.sin(angle_rad),
+                                            0)
+            self.position = self.position + self.forward_vector
+            self.shape.rotate(delta_orientation.z)
+            self.shape.translate(self.position)
+            self.shape.translate_attachments(self.orientation.z)
 
 def wrapped_cauchy_pp(random_generator,c:float) -> float:
     q = 0.5

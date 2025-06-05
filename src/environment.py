@@ -61,6 +61,7 @@ class SingleProcessEnvironment(Environment):
         for exp in self.experiments:
             arena_queue = multiprocessing.Queue()
             agents_queue = multiprocessing.Queue()
+            dec_arena_in = multiprocessing.Queue()
             dec_agents_in = multiprocessing.Queue()
             dec_agents_out = multiprocessing.Queue()
             gui_in_queue = multiprocessing.Queue()
@@ -70,9 +71,9 @@ class SingleProcessEnvironment(Environment):
             agents = self.agents_init(exp)
             collision_detector = CollisionDetector(arena.get_shape())
             entity_manager = EntityManager(agents,arena.get_shape())
-            arena_process = multiprocessing.Process(target=arena.run, args=(self.num_runs,self.time_limit,arena_queue,agents_queue,gui_in_queue,gui_out_arena_queue,self.render[0]))
+            arena_process = multiprocessing.Process(target=arena.run, args=(self.num_runs,self.time_limit,arena_queue,agents_queue,gui_in_queue,gui_out_arena_queue,dec_arena_in,self.render[0]))
             agents_process = multiprocessing.Process(target=entity_manager.run, args=(self.num_runs,self.time_limit,arena_queue,agents_queue,gui_out_agents_queue,dec_agents_in,dec_agents_out,self.render[0]))
-            detector_process = multiprocessing.Process(target=collision_detector.run, args=(dec_agents_in,dec_agents_out))
+            detector_process = multiprocessing.Process(target=collision_detector.run, args=(dec_agents_in,dec_agents_out,dec_arena_in))
             
             # Initialize GUI only if rendering is enabled
             killed = 0  
@@ -84,19 +85,6 @@ class SingleProcessEnvironment(Environment):
                 agents_process.start()
                 arena_process.start()
                 while gui_process.is_alive():
-                    if psutil.Process(gui_process.pid).status() == psutil.STATUS_ZOMBIE or psutil.Process(gui_process.pid).status() == psutil.STATUS_DEAD:
-                        gui_out_arena_queue.put({"status": "end"})
-                        gui_out_agents_queue.put({"status": "end"})
-                        killed = 1
-                        if arena_process.is_alive(): arena_process.terminate()
-                        arena_process.join()
-                        if agents_process.is_alive(): agents_process.terminate()
-                        agents_process.join()
-                        if detector_process.pid is not None:
-                            if detector_process.is_alive(): detector_process.terminate()
-                            detector_process.join()
-                        gui_process.terminate()
-                        gui_process.join()
                     if arena_process.exitcode not in (None, 0):
                         killed = 1
                         agents_process.terminate()
@@ -130,6 +118,19 @@ class SingleProcessEnvironment(Environment):
                         agents_process.join()
                         gui_process.join()
                         raise RuntimeError(f"GUI process exited with code {gui_process.exitcode}")
+                    if psutil.Process(gui_process.pid).status() == psutil.STATUS_ZOMBIE or psutil.Process(gui_process.pid).status() == psutil.STATUS_DEAD:
+                        gui_out_arena_queue.put({"status": "end"})
+                        gui_out_agents_queue.put({"status": "end"})
+                        killed = 1
+                        if arena_process.is_alive(): arena_process.terminate()
+                        arena_process.join()
+                        if agents_process.is_alive(): agents_process.terminate()
+                        agents_process.join()
+                        if detector_process.pid is not None:
+                            if detector_process.is_alive(): detector_process.terminate()
+                            detector_process.join()
+                        gui_process.terminate()
+                        gui_process.join()
                     if self.auto_close_gui and not arena_process.is_alive():
                         arena_process.join()
                         agents_process.join()
