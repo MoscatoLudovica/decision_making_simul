@@ -1,8 +1,6 @@
 import math
 from random import Random
 import numpy as np
-import matplotlib.pyplot as plt
-from matplotlib.cm import coolwarm
 
 class SpinSystem:
     def __init__(self, random_generator, num_groups, num_spins_per_group, T, J, nu, p_spin_up=0.5, time_delay=0, dynamics='metropolis'):
@@ -52,92 +50,10 @@ class SpinSystem:
 
         # Adjust differences to be within [0, pi]
         angle_diff_matrix = np.minimum(angle_diff_matrix, 2 * math.pi - angle_diff_matrix)
-        
         # Normalize differences by pi, raise to the power nu, and apply cosine
         J_matrix = np.cos(math.pi * ((angle_diff_matrix / math.pi) ** self.nu))
         
         return J_matrix
-
-    def plot_spins_and_perception(self):
-        """
-        Plot the spins and perception together in one polar plot:
-        - An inner ring (spins) around radius ~1
-        - An outer ring (perception) around radius ~2
-        """
-
-        # --- Prepare data for spins ring ---
-        group_mean_spins = self.spins.mean(axis=1)  # shape: (num_groups,)
-        # For a colormap that expects [0,1], you might normalize spins as well,
-        # but if you directly want (-1 -> +1) in a red/blue colormap, you can do:
-        # Here we assume group_mean_spins is in [-1, +1].
-        # If you want to strictly re-map to [0..1], use (group_mean_spins + 1)/2.
-        colors_spins = coolwarm((group_mean_spins))
-
-        # --- Prepare data for perception ring ---
-        group_mean_perception = (
-            self.external_field.reshape(self.num_groups, self.num_spins_per_group)
-            .mean(axis=1)
-        )  # shape: (num_groups,)
-        normalized_perception = (group_mean_perception + 1) / 2
-        colors_perception = coolwarm(normalized_perception)
-
-        # Angles for each group
-        angles = self.angles[::self.num_spins_per_group]  # shape: (num_groups,)
-
-        # --- Create a single polar plot ---
-        fig, ax = plt.subplots(subplot_kw={"projection": "polar"}, figsize=(8, 8))
-
-        # --- Spin ring (inner ring) ---
-        # 'bottom' is the radial coordinate where bars start.
-        # By default, each bar has a height of 1. So this ring goes from radius=0.5 to radius=1.5
-        bars_spins = ax.bar(
-            angles,
-            0.75,   # All bars have height=1
-            width=2 * math.pi / self.num_groups,
-            bottom=0.75,             # Shift ring inward
-            color=colors_spins,
-            edgecolor="black",
-            alpha=0.9,
-            #label="Spins",
-        )
-
-        # (Optionally) add an arrow for the average direction of spins
-        avg_angle = self.average_direction_of_activity()
-        if avg_angle is not None:
-            # Place an arrow near the inner ring
-            ax.annotate(
-                "",
-                xy=(avg_angle, 0.5),   # End of the arrow
-                xytext=(avg_angle, 0.1),  # Start of the arrow
-                arrowprops=dict(facecolor="black", arrowstyle="->", lw=2),
-            )
-
-        # --- Perception ring (outer ring) ---
-        # Similarly, place these bars further out, e.g. from radius=1.6 to 2.6
-        bars_perception = ax.bar(
-            angles,
-            0.5,
-            width=2 * math.pi / self.num_groups,
-            bottom=1.6,
-            color=colors_perception,
-            edgecolor="black",
-            alpha=0.9,
-            label="Perception",
-        )
-
-        # Hide radial labels
-        ax.set_yticklabels([])
-        # Set group ticks around the circle (optional)
-        ax.set_xticks([])
-        # ax.set_xticklabels([f'Group {i+1}' for i in range(self.num_groups)])  # if desired
-
-        # Optional: turn off the grid for a cleaner look
-        ax.grid(False)
-
-        # Add a legend if you like
-        #ax.legend(loc="upper right", bbox_to_anchor=(1.1, 1.1))
-
-        plt.show()
 
     def step(self, timedelay=True,dt=0.1, tau=33):
         """ Perform one Metropolis step, optionally using a hybrid historical state or the current state. """
@@ -242,7 +158,7 @@ class SpinSystem:
         sum_vector = np.sum(unit_vectors[active_mask])
 
         # Calculate magnitude
-        magnitude = np.abs(sum_vector)
+        magnitude = abs(sum_vector)
         
         inverse_magnitude = 1/magnitude
   
@@ -262,10 +178,10 @@ class SpinSystem:
         if len(active_angles) > 1:
             # Compute the mean resultant length R
             unit_vectors = np.exp(1j * active_angles)
-            R = np.abs(np.mean(unit_vectors))
+            R = abs(np.mean(unit_vectors))
             # Circular standard deviation can be approximated by sqrt(-2 * ln(R))
             if R > 0:
-                circ_std = np.sqrt(-2 * np.log(R))
+                circ_std = math.sqrt(-2 * math.log(R))
             else:
                 circ_std = math.pi  # Maximum possible dispersion
             return circ_std

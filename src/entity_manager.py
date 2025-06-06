@@ -54,7 +54,7 @@ class EntityManager:
                     entities[n].set_start_position(Vector3D(position.x,position.y,position.z + (abs(entities[n].get_shape().min_vert().z))))
                 entities[n].shape.translate_attachments(entities[n].orientation.z)
 
-    def close(self,):
+    def close(self):
         pass
 
     def run(self,num_runs,time_limit, arena_queue:multiprocessing.Queue, agents_queue:multiprocessing.Queue, gui_out_queue: multiprocessing.Queue, dec_agents_in:multiprocessing.Queue, dec_agents_out:multiprocessing.Queue, render:bool=False):
