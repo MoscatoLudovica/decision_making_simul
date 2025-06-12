@@ -25,9 +25,12 @@ class GUI_2D(QWidget):
         self.gui_in_queue = gui_in_queue
         self.gui_control_queue = gui_control_queue
         self.setWindowTitle("Arena GUI")
-        self._layout = QVBoxLayout()
+
+        # Layout principale orizzontale
+        self._main_layout = QHBoxLayout()
+        self._left_layout = QVBoxLayout()
         self.data_label = QLabel("Waiting for data...")
-        self._layout.addWidget(self.data_label)
+        self._left_layout.addWidget(self.data_label)
         self.button_layout = QHBoxLayout()
         self.start_button = QPushButton("Start")
         self.stop_button = QPushButton("Stop")
@@ -35,7 +38,7 @@ class GUI_2D(QWidget):
         self.button_layout.addWidget(self.start_button)
         self.button_layout.addWidget(self.stop_button)
         self.button_layout.addWidget(self.step_button)
-        self._layout.addLayout(self.button_layout)
+        self._left_layout.addLayout(self.button_layout)
         self.start_button.clicked.connect(self.start_simulation)
         self.stop_button.clicked.connect(self.stop_simulation)
         self.step_button.clicked.connect(self.step_simulation)
@@ -53,8 +56,10 @@ class GUI_2D(QWidget):
             self.figure, self.ax = plt.subplots(subplot_kw={"projection": "polar"}, figsize=(4, 4))
             self.canvas = FigureCanvas(self.figure)
 
-        self._layout.addWidget(self.view)
-        self.setLayout(self._layout)
+        self._left_layout.addWidget(self.view)
+        self._main_layout.addLayout(self._left_layout)
+        # La canvas viene aggiunta solo quando serve
+        self.setLayout(self._main_layout)
         self.view.viewport().installEventFilter(self)
         self.resizeEvent(None)
         self.timer = QTimer(self)
@@ -77,11 +82,11 @@ class GUI_2D(QWidget):
                 self.clicked_spin = self.get_agent_at(scene_pos)
                 if self.clicked_spin:
                     if not self.canvas_visible:
-                        self._layout.insertWidget(1, self.canvas)  # Mostra la canvas
+                        self._main_layout.addWidget(self.canvas)  # Mostra la canvas a destra
                         self.canvas_visible = True
                         self.update_spins_plot()
                     else:
-                        self._layout.removeWidget(self.canvas)
+                        self._main_layout.removeWidget(self.canvas)
                         self.canvas.setParent(None)
                         self.canvas_visible = False
             return True
@@ -100,8 +105,7 @@ class GUI_2D(QWidget):
                         )
                         for vertex in entity.vertices()
                     ])
-                    if polygon.containsPoint(scene_pos, Qt.FillRule.OddEvenFill):
-                        return key,idx
+                    if polygon.containsPoint(scene_pos, Qt.FillRule.OddEvenFill): return key,idx
                     idx += 1
         return None
     
