@@ -1,4 +1,4 @@
-import logging,multiprocessing,psutil
+import logging,multiprocessing,psutil,gc
 from config import Config
 from entity import EntityFactory
 from arena import ArenaFactory
@@ -51,9 +51,9 @@ class SingleProcessEnvironment(Environment):
         logging.info(f"Agents initialized: {list(agents.keys())}")
         return agents
 
-    def run_gui(self, config, arena_vertices, arena_color,gui_in_queue):
+    def run_gui(self, config, arena_vertices, arena_color,gui_in_queue,gui_control_queue):
         """Function to run the GUI in a separate process"""
-        app,gui = GuiFactory.create_gui(config,arena_vertices,arena_color,gui_in_queue)
+        app,gui = GuiFactory.create_gui(config,arena_vertices,arena_color,gui_in_queue,gui_control_queue)
         gui.show()
         app.exec()
 
@@ -67,11 +67,12 @@ class SingleProcessEnvironment(Environment):
             gui_in_queue = multiprocessing.Queue()
             gui_out_arena_queue = multiprocessing.Queue()
             gui_out_agents_queue = multiprocessing.Queue()
+            gui_control_queue = multiprocessing.Queue()
             arena = self.arena_init(exp)
             agents = self.agents_init(exp)
             collision_detector = CollisionDetector(arena.get_shape())
             entity_manager = EntityManager(agents,arena.get_shape())
-            arena_process = multiprocessing.Process(target=arena.run, args=(self.num_runs,self.time_limit,arena_queue,agents_queue,gui_in_queue,gui_out_arena_queue,dec_arena_in,self.render[0]))
+            arena_process = multiprocessing.Process(target=arena.run, args=(self.num_runs,self.time_limit,arena_queue,agents_queue,gui_in_queue,gui_out_arena_queue,dec_arena_in,gui_control_queue,self.render[0]))
             agents_process = multiprocessing.Process(target=entity_manager.run, args=(self.num_runs,self.time_limit,arena_queue,agents_queue,gui_out_agents_queue,dec_agents_in,dec_agents_out,self.render[0]))
             detector_process = multiprocessing.Process(target=collision_detector.run, args=(dec_agents_in,dec_agents_out,dec_arena_in))
             
@@ -79,7 +80,7 @@ class SingleProcessEnvironment(Environment):
             killed = 0  
             if self.render[0]:
                 self.render[1]["_id"] = "abstract" if arena.get_id() in (None, "none") else self.gui_id
-                gui_process = multiprocessing.Process(target=self.run_gui, args=(self.render[1],arena.get_shape().vertices(),arena.get_shape().color(),gui_in_queue))
+                gui_process = multiprocessing.Process(target=self.run_gui, args=(self.render[1],arena.get_shape().vertices(),arena.get_shape().color(),gui_in_queue,gui_control_queue)) # type: ignore
                 gui_process.start()
                 if arena.get_id() not in ("abstract", "none", None): detector_process.start()
                 agents_process.start()
@@ -172,6 +173,7 @@ class SingleProcessEnvironment(Environment):
                     agents_process.join()
                     if detector_process.is_alive(): detector_process.terminate()
                     detector_process.join()
+            gc.collect()
         logging.info("All experiments completed successfully")
 
 class MultiProcessEnvironment(Environment):

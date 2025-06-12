@@ -1,103 +1,174 @@
-import logging
-from PySide6.QtWidgets import QApplication, QWidget, QVBoxLayout, QLabel, QGraphicsView, QGraphicsScene
+import logging, math
+import matplotlib.pyplot as plt
+from matplotlib.cm import coolwarm
+from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
+from PySide6.QtWidgets import QApplication, QWidget, QVBoxLayout, QLabel, QGraphicsView, QGraphicsScene, QPushButton, QHBoxLayout
 from PySide6.QtCore import QTimer, Qt, QPointF
 from PySide6.QtGui import QPolygonF, QColor, QPen, QBrush
+
 class GuiFactory():
 
     @staticmethod
-    def create_gui(config_elem:dict,arena_vertices,arena_color,gui_in_queue):
+    def create_gui(config_elem:dict,arena_vertices,arena_color,gui_in_queue,gui_control_queue):
         if config_elem.get("_id") in ("2D","abstract"):
-            return QApplication([]),GUI_2D(config_elem,arena_vertices,arena_color,gui_in_queue)
-        # elif config_elem.get("_id") == "3D":
-        #     return GUI_3D(config_elem,arena_vertices,arena_color,gui_in_queue)
+            return QApplication([]),GUI_2D(config_elem,arena_vertices,arena_color,gui_in_queue,gui_control_queue)
         else:
-            raise ValueError(f"Invalid gui type: {config_elem.gui['_id']} valid types are '2D' or '3D'")
+            raise ValueError(f"Invalid gui type: {config_elem.get('_id')} valid types are '2D' or '3D'")
 
 class GUI_2D(QWidget):
-    def __init__(self, config_elem: dict,arena_vertices,arena_color,gui_in_queue):
+    def __init__(self, config_elem: dict,arena_vertices,arena_color,gui_in_queue,gui_control_queue):
         super().__init__()
         self._id = "2D"
-        self.show_trajectories = config_elem.get("show_trajectories", False)
-        self.show_communication = config_elem.get("show_communication", False)
+        self.show_spins = config_elem.get("show_spins", False)
         self.arena_vertices = arena_vertices
         self.arena_color = arena_color
         self.gui_in_queue = gui_in_queue
-        self.setWindowTitle("Robot Arena GUI")
-
+        self.gui_control_queue = gui_control_queue
+        self.setWindowTitle("Arena GUI")
         self._layout = QVBoxLayout()
         self.data_label = QLabel("Waiting for data...")
         self._layout.addWidget(self.data_label)
-        
-        # Graphics View for arena visualization
+        self.button_layout = QHBoxLayout()
+        self.start_button = QPushButton("Start")
+        self.stop_button = QPushButton("Stop")
+        self.step_button = QPushButton("Step")
+        self.button_layout.addWidget(self.start_button)
+        self.button_layout.addWidget(self.stop_button)
+        self.button_layout.addWidget(self.step_button)
+        self._layout.addLayout(self.button_layout)
+        self.start_button.clicked.connect(self.start_simulation)
+        self.stop_button.clicked.connect(self.stop_simulation)
+        self.step_button.clicked.connect(self.step_simulation)
         self.scale = 1
         self.view = QGraphicsView()
+        self.view.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.view.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.scene = QGraphicsScene()
         self.scene.setSceneRect(0, 0, 800, 800)
         self.view.setScene(self.scene)
+
+        if self.show_spins:
+            self.figure, self.ax = plt.subplots(subplot_kw={"projection": "polar"}, figsize=(4, 4))
+            self.canvas = FigureCanvas(self.figure)
+            self._layout.addWidget(self.canvas)
+
         self._layout.addWidget(self.view)
         self.setLayout(self._layout)
-
-        # Timer to update GUI every 100ms
+        self.resizeEvent(None)
         self.timer = QTimer(self)
         self.connection = self.timer.timeout.connect(self.update_data)
         self.timer.start(1)
         self.time = None
         self.objects_shapes = None
         self.agents_shapes = None
-
+        self.agents_spins = None
+        self.running = False
+        self.step_requested = False
         logging.info("2D GUI created successfully")
 
-    def update_data(self):
-        if self.gui_in_queue.qsize() > 0:
-            data = self.gui_in_queue.get()
-            self.time = data["status"][0]
-            o_shapes = {}
-            for k, item in data["objects"].items():
-                o_shapes.update({k:item[0]})
-            self.objects_shapes = o_shapes
-            self.agents_shapes = data["agents_shapes"]
-            # print(self.objects_shapes,'\n')
-            # print('\n',self.agents_shapes)
-        self.update_scene()
-        self.update()
-
-    def draw_arena(self):
-        """Scale and center the arena vertices within the drawing box."""
-
-        # Get the dimensions of the drawing box
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
         view_width = self.view.viewport().width()
         view_height = self.view.viewport().height()
+        self.scene.setSceneRect(0, 0, view_width, view_height)
+        self.scene.clear()
+        self.draw_arena()
 
-        # Calculate the bounding box of the arena vertices
+    def start_simulation(self):
+        self.gui_control_queue.put("start")
+        self.running = True
+
+    def stop_simulation(self):
+        self.gui_control_queue.put("stop")
+        self.running = False
+
+    def step_simulation(self):
+        if not self.running:
+            self.gui_control_queue.put("step")
+            self.step_requested = True
+
+    def update_spins_plot(self):
+        self.ax.clear()
+        if self.agents_spins is not None:
+            self.scene.setBackgroundBrush(QColor(240, 240, 240))
+            for _, spins in self.agents_spins.items():
+                for spin in spins:
+                    group_mean_spins = spin[0].mean(axis=1)
+                    colors_spins = coolwarm((group_mean_spins))
+                    group_mean_perception = (
+                        spin[2].reshape(spin[1][1], spin[1][2]).mean(axis=1))
+                    normalized_perception = (group_mean_perception + 1) / 2
+                    colors_perception = coolwarm(normalized_perception)
+                    angles = spin[1][0][::spin[1][2]]
+                    self.ax.bar(
+                        angles,
+                        0.75,   # All bars have height=1
+                        width=2 * math.pi / spin[1][1],
+                        bottom=0.75,             # Shift ring inward
+                        color=colors_spins,
+                        edgecolor="black",
+                        alpha=0.9,
+                        #label="Spins",
+                    )
+                    avg_angle = spin[3]
+                    if avg_angle is not None:
+                        # Place an arrow near the inner ring
+                        self.ax.annotate(
+                            "",
+                            xy=(avg_angle, 0.5),   # End of the arrow
+                            xytext=(avg_angle, 0.1),  # Start of the arrow
+                            arrowprops=dict(facecolor="black", arrowstyle="->", lw=2),
+                        )
+                    self.ax.bar(
+                        angles,
+                        0.5,
+                        width=2 * math.pi / spin[1][1],
+                        bottom=1.6,
+                        color=colors_perception,
+                        edgecolor="black",
+                        alpha=0.9,
+                        label="Perception",
+                    )
+                    self.ax.set_yticklabels([])
+                    self.ax.set_xticks([])
+                    self.ax.grid(False)
+        self.canvas.draw()
+
+    def update_data(self):
+        if self.running or self.step_requested:
+            if self.gui_in_queue.qsize() > 0:
+                data = self.gui_in_queue.get()
+                self.time = data["status"][0]
+                o_shapes = {}
+                for k, item in data["objects"].items():
+                    o_shapes.update({k:item[0]})
+                self.objects_shapes = o_shapes
+                self.agents_shapes = data["agents_shapes"]
+                self.agents_spins = data["agents_spins"]
+            self.update_scene()
+            if self.show_spins: self.update_spins_plot()
+            self.update()
+            if self.step_requested:
+                self.step_requested = False
+
+    def draw_arena(self):
+        view_width = self.view.viewport().width()
+        view_height = self.view.viewport().height()
         min_x = min(v.x for v in self.arena_vertices)
-        max_x = max(v.x for v in self.arena_vertices)
         min_y = min(v.y for v in self.arena_vertices)
+        max_x = max(v.x for v in self.arena_vertices)
         max_y = max(v.y for v in self.arena_vertices)
-
-        # Calculate the arena width and height in meters
         arena_width = max_x - min_x
         arena_height = max_y - min_y
-
-        # Add a margin (e.g., 10% of the arena size)
-        margin_x = 0.05
-        margin_y = 0.05
-
-        # Calculate the scaling factor to fit the arena within the drawing box
-        scale_x = view_width / (arena_width + 2 * margin_x)
-        scale_y = view_height / (arena_height + 2 * margin_y)
+        margin_x = 40
+        margin_y = 40
+        # keep the arena in the view
+        scale_x = (view_width - 2*margin_x) / arena_width if arena_width > 0 else 1
+        scale_y = (view_height - 2*margin_y) / arena_height if arena_height > 0 else 1
         self.scale = min(scale_x, scale_y)
-
-        # Update pixels_per_meter to match the new scale
-
-        # Center the arena in the drawing box
-        offset_x = (view_width - (arena_width + 2 * margin_x) * self.scale) / 2
-        offset_y = (view_height - (arena_height + 2 * margin_y) * self.scale) / 2
-
-        # Store offsets for use with agents and objects
-        self.offset_x = offset_x - (min_x - margin_x) * self.scale
-        self.offset_y = offset_y - (min_y - margin_y) * self.scale
-
-        # Transform the arena vertices
+        # Offset: top-left corner in (margin_x, margin_y)
+        self.offset_x = margin_x - min_x * self.scale
+        self.offset_y = margin_y - min_y * self.scale
         transformed_vertices = [
             QPointF(
                 v.x * self.scale + self.offset_x,
@@ -105,21 +176,16 @@ class GUI_2D(QWidget):
             )
             for v in self.arena_vertices
         ]
-
-        # Draw the transformed arena
         polygon = QPolygonF(transformed_vertices)
         self.scene.addPolygon(polygon, QPen(Qt.black, 2), QBrush(QColor(self.arena_color)))
 
     def update_scene(self):
         self.data_label.setText(f"Time: {self.time}")
         self.scene.clear()
-
-        # Draw the arena
         self.draw_arena()
-
-        if self.objects_shapes != None:
+        if self.objects_shapes is not None:
             self.scene.setBackgroundBrush(QColor(240, 240, 240))
-            for key, entities in self.objects_shapes.items():
+            for _, entities in self.objects_shapes.items():
                 for entity in entities:
                     entity_vertices = [
                         QPointF(
@@ -131,9 +197,9 @@ class GUI_2D(QWidget):
                     entity_polygon = QPolygonF(entity_vertices)
                     entity_color = QColor(entity.color())
                     self.scene.addPolygon(entity_polygon, QPen(entity_color, .1), QBrush(entity_color))
-        if self.agents_shapes != None:
+        if self.agents_shapes is not None:
             self.scene.setBackgroundBrush(QColor(240, 240, 240))
-            for key, entities in self.agents_shapes.items():
+            for _, entities in self.agents_shapes.items():
                 for entity in entities:
                     entity_vertices = [
                         QPointF(
@@ -156,14 +222,4 @@ class GUI_2D(QWidget):
                         ]
                         attachment_polygon = QPolygonF(attachment_vertices)
                         attachment_color = QColor(attachment.color())
-                        self.scene.addPolygon(attachment_polygon, QPen(attachment_color, 1), QBrush(attachment_color))       
-
-# class GUI_3D:
-
-#     def __init__(self, config_elem: dict,arena_vertices,arena_color,gui_in_queue):
-#         if config_elem.get("_id") == "abstract":
-#             logging.info("Switching to 2D GUI")
-#             GUI_2D(config_elem,arena_vertices,arena_color,gui_in_queue)
-#         else:
-#             self._id = "3D"
-#             logging.info("3D GUI created successfully")
+                        self.scene.addPolygon(attachment_polygon, QPen(attachment_color, 1), QBrush(attachment_color))

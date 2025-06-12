@@ -1,9 +1,10 @@
-import logging, gc, multiprocessing
+import logging, multiprocessing, time
 from config import Config
 from random import Random
 from bodies.shapes3D import Shape3DFactory
 from entity import EntityFactory
 from geometry_utils.vector3D import Vector3D
+from dataHandling import DataHandlingFactory
 
 class ArenaFactory():
 
@@ -29,6 +30,8 @@ class Arena():
         self._id = "none" if config_elem.arena.get("_id") == "abstract" else config_elem.arena.get("_id","none") 
         self.objects = {object_type: (config_elem.environment.get("objects",{}).get(object_type),[]) for object_type in config_elem.environment.get("objects",{}).keys()}
         self.agents_shapes = {}
+        self.agents_spins = {}
+        self.data_handling = DataHandlingFactory.create_data_handling(config_elem)
 
     def get_id(self):
         return self._id
@@ -57,7 +60,7 @@ class Arena():
             for n in range(config["number"]):
                 entities.append(EntityFactory.create_entity(entity_type="object_"+key,config_elem=config,_id=n))
                 
-    def run(self,num_runs,time_limit, arena_queue:multiprocessing.Queue, agents_queue:multiprocessing.Queue, gui_in_queue:multiprocessing.Queue, gui_out_queue:multiprocessing.Queue ,dec_arena_in:multiprocessing.Queue, render:bool=False):
+    def run(self,num_runs,time_limit, arena_queue:multiprocessing.Queue, agents_queue:multiprocessing.Queue, gui_in_queue:multiprocessing.Queue, gui_out_queue:multiprocessing.Queue ,dec_arena_in:multiprocessing.Queue, gui_control_queue:multiprocessing.Queue, render:bool=False):
         pass
 
     def reset(self):
@@ -158,61 +161,77 @@ class SolidArena(Arena):
             out.update({entities[0].entity():(shapes,positions)})
         return out
         
-    def run(self,num_runs,time_limit, arena_queue:multiprocessing.Queue, agents_queue:multiprocessing.Queue, gui_in_queue:multiprocessing.Queue, gui_out_queue:multiprocessing.Queue,dec_arena_in:multiprocessing.Queue, render:bool=False):
+    def run(self,num_runs,time_limit, arena_queue:multiprocessing.Queue, agents_queue:multiprocessing.Queue, gui_in_queue:multiprocessing.Queue, gui_out_queue:multiprocessing.Queue,dec_arena_in:multiprocessing.Queue, gui_control_queue:multiprocessing.Queue,render:bool=False):
         """Function to run the arena in a separate process"""
         ticks_limit = time_limit*self.ticks_per_second + 1 if time_limit > 0 else 0
         for run in range(1, num_runs + 1):
             logging.info(f"Run number {run} started")
             arena_data = {
                 "status": [0,self.ticks_per_second],
-                "objects": self.pack_objects_data(),
+                "objects": self.pack_objects_data()
             }
             if render:
-                gui_in_queue.put({**arena_data, "agents_shapes": self.agents_shapes})
+                gui_in_queue.put({**arena_data, "agents_shapes": self.agents_shapes, "agents_spins": self.agents_spins})
             arena_queue.put({**arena_data, "random_seed": self.random_seed})
             while agents_queue.qsize() == 0: pass
             data_in = agents_queue.get()
             self.agents_shapes = data_in["agents_shapes"]
+            self.agents_spins = data_in["agents_spins"]
             t = 1
+            running = False if render else True
+            step_mode = False
             while True:
                 if ticks_limit > 0 and t >= ticks_limit: break
-                if not render:
-                    print(f"\rarena_ticks {t}", end='', flush=True)
+                if render and gui_control_queue.qsize()>0:
+                    cmd = gui_control_queue.get()
+                    if cmd == "start":
+                        running = True
+                        step_mode = False
+                    elif cmd == "stop":
+                        running = False
+                    elif cmd == "step":
+                        step_mode = True
+                        running = False
                 arena_data = {
                     "status": [t,self.ticks_per_second],
-                    "objects": self.pack_objects_data(),
+                    "objects": self.pack_objects_data()
                 }
-                arena_queue.put(arena_data)
-                while data_in["status"][0]/data_in["status"][1] < t/self.ticks_per_second:
-                    if agents_queue.qsize()>0: data_in = agents_queue.get()
-                    arena_data = {
-                        "status": [t,self.ticks_per_second],
-                        "objects": self.pack_objects_data(),
-                    }
-                    detector_data = {
-                        "objects": self.pack_detector_data()
-                    }
-                    if arena_queue.qsize()==0:
-                        arena_queue.put(arena_data)
-                        dec_arena_in.put(detector_data)
+                if running or step_mode:
+                    if not render:
+                        print(f"\rarena_ticks {t}", end='', flush=True)
+                    arena_queue.put(arena_data)
+                    while data_in["status"][0]/data_in["status"][1] < t/self.ticks_per_second:
+                        if agents_queue.qsize()>0: data_in = agents_queue.get()
+                        arena_data = {
+                            "status": [t,self.ticks_per_second],
+                            "objects": self.pack_objects_data()
+                        }
+                        detector_data = {
+                            "objects": self.pack_detector_data()
+                        }
+                        if arena_queue.qsize()==0:
+                            arena_queue.put(arena_data)
+                            dec_arena_in.put(detector_data)
 
-                if agents_queue.qsize()>0: data_in = agents_queue.get()
-                self.agents_shapes = data_in["agents_shapes"]
-                if render:
-                    gui_in_queue.put({**arena_data, "agents_shapes": self.agents_shapes})
-                    if gui_out_queue.qsize() > 0:
-                        gui_data = gui_out_queue.get()
-                        if gui_data["status"] == "end":
-                            self.close()
-                            break
-                t += 1
+                    if agents_queue.qsize()>0: data_in = agents_queue.get()
+                    self.agents_shapes = data_in["agents_shapes"]
+                    self.agents_spins = data_in["agents_spins"]
+                    if render:
+                        gui_in_queue.put({**arena_data, "agents_shapes": self.agents_shapes, "agents_spins": self.agents_spins})
+                        if gui_out_queue.qsize() > 0:
+                            gui_data = gui_out_queue.get()
+                            if gui_data["status"] == "end":
+                                self.close()
+                                break
+                    step_mode = False
+                    t += 1
+                else: time.sleep(0.05)
             if t < ticks_limit: break
             if run < num_runs:
                 self.increment_seed()
                 self.reset()
             else:
                 self.close()
-        gc.collect()
         
     def reset(self):
         super().reset()
