@@ -58,7 +58,6 @@ class GUI_2D(QWidget):
 
         self._left_layout.addWidget(self.view)
         self._main_layout.addLayout(self._left_layout)
-        # La canvas viene aggiunta solo quando serve
         self.setLayout(self._main_layout)
         self.view.viewport().installEventFilter(self)
         self.resizeEvent(None)
@@ -81,19 +80,18 @@ class GUI_2D(QWidget):
                 scene_pos = self.view.mapToScene(pos)
                 self.clicked_spin = self.get_agent_at(scene_pos)
                 if self.clicked_spin:
+                    self._main_layout.removeWidget(self.canvas)
+                    self.canvas.setParent(None)
                     if not self.canvas_visible:
-                        self._main_layout.addWidget(self.canvas)  # Mostra la canvas a destra
+                        self._main_layout.addWidget(self.canvas)
                         self.canvas_visible = True
-                        self.update_spins_plot()
                     else:
                         self._main_layout.removeWidget(self.canvas)
-                        self.canvas.setParent(None)
                         self.canvas_visible = False
             return True
         return super().eventFilter(watched, event)
     
     def get_agent_at(self, scene_pos):
-        # Cerca un agente che contenga la posizione cliccata
         if self.agents_shapes is not None:
             for key , entities in self.agents_shapes.items():
                 idx = 0
@@ -132,7 +130,7 @@ class GUI_2D(QWidget):
 
     def update_spins_plot(self):
         self.ax.clear()
-        if self.clicked_spin:
+        if self.clicked_spin and self.agents_spins is not None:
             spin = self.agents_spins.get(self.clicked_spin[0])[self.clicked_spin[1]]
             self.scene.setBackgroundBrush(QColor(240, 240, 240))
             group_mean_spins = spin[0].mean(axis=1)
