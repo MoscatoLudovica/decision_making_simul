@@ -3,8 +3,8 @@ import matplotlib.pyplot as plt
 from matplotlib.cm import coolwarm
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from PySide6.QtWidgets import QApplication, QWidget, QVBoxLayout, QLabel, QGraphicsView, QGraphicsScene, QPushButton, QHBoxLayout
-from PySide6.QtCore import QTimer, Qt, QPointF
-from PySide6.QtGui import QPolygonF, QColor, QPen, QBrush
+from PySide6.QtCore import QTimer, Qt, QPointF, QEvent
+from PySide6.QtGui import QPolygonF, QColor, QPen, QBrush, QMouseEvent
 
 class GuiFactory():
 
@@ -19,7 +19,7 @@ class GUI_2D(QWidget):
     def __init__(self, config_elem: dict,arena_vertices,arena_color,gui_in_queue,gui_control_queue):
         super().__init__()
         self._id = "2D"
-        self.show_spins = config_elem.get("show_spins", False)
+        self.on_click = config_elem.get("on_click", None)
         self.arena_vertices = arena_vertices
         self.arena_color = arena_color
         self.gui_in_queue = gui_in_queue
@@ -46,14 +46,16 @@ class GUI_2D(QWidget):
         self.scene = QGraphicsScene()
         self.scene.setSceneRect(0, 0, 800, 800)
         self.view.setScene(self.scene)
-
-        if self.show_spins:
+        
+        self.clicked_spin = None
+        self.canvas_visible = False
+        if self.on_click == "show_spins":
             self.figure, self.ax = plt.subplots(subplot_kw={"projection": "polar"}, figsize=(4, 4))
             self.canvas = FigureCanvas(self.figure)
-            self._layout.addWidget(self.canvas)
 
         self._layout.addWidget(self.view)
         self.setLayout(self._layout)
+        self.view.viewport().installEventFilter(self)
         self.resizeEvent(None)
         self.timer = QTimer(self)
         self.connection = self.timer.timeout.connect(self.update_data)
@@ -66,6 +68,43 @@ class GUI_2D(QWidget):
         self.step_requested = False
         logging.info("2D GUI created successfully")
 
+    def eventFilter(self, watched, event):
+        if watched == self.view.viewport() and event.type() == QEvent.Type.MouseButtonPress:
+            mouse_event = event if isinstance(event, QMouseEvent) else None
+            if mouse_event and mouse_event.button() == Qt.MouseButton.LeftButton:
+                pos = mouse_event.pos()
+                scene_pos = self.view.mapToScene(pos)
+                self.clicked_spin = self.get_agent_at(scene_pos)
+                if self.clicked_spin:
+                    if not self.canvas_visible:
+                        self._layout.insertWidget(1, self.canvas)  # Mostra la canvas
+                        self.canvas_visible = True
+                        self.update_spins_plot()
+                    else:
+                        self._layout.removeWidget(self.canvas)
+                        self.canvas.setParent(None)
+                        self.canvas_visible = False
+            return True
+        return super().eventFilter(watched, event)
+    
+    def get_agent_at(self, scene_pos):
+        # Cerca un agente che contenga la posizione cliccata
+        if self.agents_shapes is not None:
+            for key , entities in self.agents_shapes.items():
+                idx = 0
+                for entity in entities:
+                    polygon = QPolygonF([
+                        QPointF(
+                            vertex.x * self.scale + self.offset_x,
+                            vertex.y * self.scale + self.offset_y
+                        )
+                        for vertex in entity.vertices()
+                    ])
+                    if polygon.containsPoint(scene_pos, Qt.FillRule.OddEvenFill):
+                        return key,idx
+                    idx += 1
+        return None
+    
     def resizeEvent(self, event):
         super().resizeEvent(event)
         view_width = self.view.viewport().width()
@@ -89,49 +128,48 @@ class GUI_2D(QWidget):
 
     def update_spins_plot(self):
         self.ax.clear()
-        if self.agents_spins is not None:
+        if self.clicked_spin:
+            spin = self.agents_spins.get(self.clicked_spin[0])[self.clicked_spin[1]]
             self.scene.setBackgroundBrush(QColor(240, 240, 240))
-            for _, spins in self.agents_spins.items():
-                for spin in spins:
-                    group_mean_spins = spin[0].mean(axis=1)
-                    colors_spins = coolwarm((group_mean_spins))
-                    group_mean_perception = (
-                        spin[2].reshape(spin[1][1], spin[1][2]).mean(axis=1))
-                    normalized_perception = (group_mean_perception + 1) / 2
-                    colors_perception = coolwarm(normalized_perception)
-                    angles = spin[1][0][::spin[1][2]]
-                    self.ax.bar(
-                        angles,
-                        0.75,   # All bars have height=1
-                        width=2 * math.pi / spin[1][1],
-                        bottom=0.75,             # Shift ring inward
-                        color=colors_spins,
-                        edgecolor="black",
-                        alpha=0.9,
-                        #label="Spins",
-                    )
-                    avg_angle = spin[3]
-                    if avg_angle is not None:
-                        # Place an arrow near the inner ring
-                        self.ax.annotate(
-                            "",
-                            xy=(avg_angle, 0.5),   # End of the arrow
-                            xytext=(avg_angle, 0.1),  # Start of the arrow
-                            arrowprops=dict(facecolor="black", arrowstyle="->", lw=2),
-                        )
-                    self.ax.bar(
-                        angles,
-                        0.5,
-                        width=2 * math.pi / spin[1][1],
-                        bottom=1.6,
-                        color=colors_perception,
-                        edgecolor="black",
-                        alpha=0.9,
-                        label="Perception",
-                    )
-                    self.ax.set_yticklabels([])
-                    self.ax.set_xticks([])
-                    self.ax.grid(False)
+            group_mean_spins = spin[0].mean(axis=1)
+            colors_spins = coolwarm((group_mean_spins))
+            group_mean_perception = (
+                spin[2].reshape(spin[1][1], spin[1][2]).mean(axis=1))
+            normalized_perception = (group_mean_perception + 1) / 2
+            colors_perception = coolwarm(normalized_perception)
+            angles = spin[1][0][::spin[1][2]]
+            self.ax.bar(
+                angles,
+                0.75,   # All bars have height=1
+                width=2 * math.pi / spin[1][1],
+                bottom=0.75,             # Shift ring inward
+                color=colors_spins,
+                edgecolor="black",
+                alpha=0.9,
+                #label="Spins",
+            )
+            avg_angle = spin[3]
+            if avg_angle is not None:
+                # Place an arrow near the inner ring
+                self.ax.annotate(
+                    "",
+                    xy=(avg_angle, 0.5),   # End of the arrow
+                    xytext=(avg_angle, 0.1),  # Start of the arrow
+                    arrowprops=dict(facecolor="black", arrowstyle="->", lw=2),
+                )
+            self.ax.bar(
+                angles,
+                0.5,
+                width=2 * math.pi / spin[1][1],
+                bottom=1.6,
+                color=colors_perception,
+                edgecolor="black",
+                alpha=0.9,
+                label="Perception",
+            )
+            self.ax.set_yticklabels([])
+            self.ax.set_xticks([])
+            self.ax.grid(False)
         self.canvas.draw()
 
     def update_data(self):
@@ -146,7 +184,7 @@ class GUI_2D(QWidget):
                 self.agents_shapes = data["agents_shapes"]
                 self.agents_spins = data["agents_spins"]
             self.update_scene()
-            if self.show_spins: self.update_spins_plot()
+            if self.on_click == "show_spins" and self.canvas_visible: self.update_spins_plot()
             self.update()
             if self.step_requested:
                 self.step_requested = False

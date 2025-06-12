@@ -13,7 +13,7 @@
         },
         "gui":{
             "_id": "2D",
-            "show_spins": false
+            "on_click": "show_spins"
         },
         "arenas":{
             "arena_0":{
@@ -40,7 +40,7 @@
         "agents":{
             "movable_0":{
                 "ticks_per_second": 31,
-                "number": [1],
+                "number": [2],
                 "position": [[0, 0.4, 0]],
                 "shape": "cylinder",
                 "height": 0.02,
