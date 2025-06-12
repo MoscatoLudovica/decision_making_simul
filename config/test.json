@@ -13,8 +13,7 @@
         },
         "gui":{
             "_id": "2D",
-            "show_trajectories": false,
-            "show_communication": false
+            "show_spins": false
         },
         "arenas":{
             "arena_0":{
@@ -34,7 +33,7 @@
                 "height": 0.2,
                 "diameter": 0.05,
                 "color": "green",
-                "strength": [[5, 5]],
+                "strength": [[5, 5.5]],
                 "uncertainty": [[0.1]]
             }
         },
@@ -49,12 +48,12 @@
                 "color": "blue",
                 "detection": "visual",
                 "moving_behavior":"spin_model",
-                "perception_width": [0.1],
-                "num_groups": [16],
-                "num_spins_per_group": [5],
-                "perception_global_inhibition": [0],
+                "perception_width": [0.5],
+                "num_groups": [32],
+                "num_spins_per_group": [10],
+                "perception_global_inhibition": [1],
                 "T": [0.1],
-                "J": [5],
+                "J": [10],
                 "nu": [0.2],
                 "p_spin_up": [0.5],
                 "time_delay": [0],
