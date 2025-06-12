@@ -20,15 +20,15 @@ class SpinSystem:
         group_angles = np.linspace(0, 2 * math.pi, num_groups, endpoint=False)
         self.angles = np.repeat(group_angles, self.num_spins_per_group)  # This ensures angles are 1D
         self.external_field = np.zeros(self.num_groups * self.num_spins_per_group)  # Placeholder for external field strengths
-
-    def calculate_hamiltonian(self, state=None):
+        self.avg_direction = None  # No active spins
+        
+    def calculate_hamiltonian(self, state):
         """ Calculate the Hamiltonian using the provided state or the historical state if none provided. """
+        state_to_use = state  # Use the provided state
         if state is None:
             if not self.spins_history:  # Check if the deque is empty
                 raise ValueError("Spin history is unexpectedly empty")
             state_to_use = self.spins_history[0]  # Always use the oldest state in the history
-        else:
-            state_to_use = state  # Use the provided state
 
         J_matrix = self.calculate_j_matrix()
         spin_interaction_matrix = np.outer(state_to_use.flatten(), state_to_use.flatten())
@@ -60,14 +60,13 @@ class SpinSystem:
         # Select a random spin
         i = Random.randint(self.random_generator,0,self.num_groups-1)
         j = Random.randint(self.random_generator,0,self.num_spins_per_group-1)
+        # Use the current state directly
+        state_to_use = self.spins
         if timedelay:
             # Create a hybrid state using the latest historical state
             hybrid_state = self.spins_history[-1]
             hybrid_state[i, j] = self.spins[i, j]  # Update the specific spin to its current state
             state_to_use = hybrid_state
-        else:
-            # Use the current state directly
-            state_to_use = self.spins
 
         # Calculate current Hamiltonian using the selected state
         current_hamiltonian = self.calculate_hamiltonian(state_to_use)
@@ -113,18 +112,18 @@ class SpinSystem:
             # Accept the spin flip
             self.spins[i, j] ^= 1
 
-    def run_simulation(self, steps=1, dt=None, tau=None):
-        for _ in range(steps):
-            self.step(dt=dt, tau=tau)
+    def run_spins(self, steps=1, dt=0.1, tau=33):
+        for _ in range(steps): self.step(dt=dt, tau=tau)
         return self.spins
     
     #maybe add circ.stats in the future
     def average_direction_of_activity(self):
         # Flatten the spins array and get the angles corresponding to each spin
+        self.avg_direction = None
         flattened_spins = self.spins.flatten()
         # If all spins are active, return None
         if np.all(flattened_spins == 1):
-            return None
+            return self.avg_direction
 
         # Applica la rotazione dell'orientamento
         unit_vectors = np.exp(1j * self.angles)  # Complex numbers representing unit vectors
@@ -136,13 +135,12 @@ class SpinSystem:
         sum_vector = np.sum(unit_vectors[active_mask])
 
         # Normalize to get the unit direction
-        if sum_vector != 0:
-            avg_direction = np.angle(sum_vector)  # Returns the angle in radians
-        else:
-            avg_direction = None  # No active spins
-
-        return avg_direction
+        if sum_vector != 0: self.avg_direction = np.angle(sum_vector)  # Returns the angle in radians
+        return self.avg_direction
     
+    def get_avg_direction_of_activity(self):
+        return self.avg_direction
+
     def get_inverse_magnitude_of_activity(self):
         """
         Calculate the magnitude of the summed vectors of active spins, normalized by total number of spins.
@@ -180,13 +178,10 @@ class SpinSystem:
             unit_vectors = np.exp(1j * active_angles)
             R = abs(np.mean(unit_vectors))
             # Circular standard deviation can be approximated by sqrt(-2 * ln(R))
-            if R > 0:
-                circ_std = math.sqrt(-2 * math.log(R))
-            else:
-                circ_std = math.pi  # Maximum possible dispersion
+            circ_std = math.pi  # Maximum possible dispersion
+            if R > 0: circ_std = math.sqrt(-2 * math.log(R))
             return circ_std
-        else:
-            return None  # Not enough active spins to compute width
+        return None  # Not enough active spins to compute width
     
 
     def update_external_field(self, perceptual_outputs):
@@ -196,6 +191,12 @@ class SpinSystem:
     def get_states(self):
         """Return the current spin states in their original matrix form."""
         return self.spins
+    
+    def get_external_field(self):
+        return self.external_field
+    
+    def get_angles(self):
+        return (self.angles,self.num_groups,self.num_spins_per_group)
     
     def set_states(self, states):
         """Set the spin states directly from an external source."""

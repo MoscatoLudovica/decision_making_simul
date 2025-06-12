@@ -1,4 +1,4 @@
-import gc, multiprocessing
+import multiprocessing
 from random import Random
 from geometry_utils.vector3D import Vector3D
 
@@ -60,7 +60,7 @@ class EntityManager:
     def run(self,num_runs,time_limit, arena_queue:multiprocessing.Queue, agents_queue:multiprocessing.Queue, gui_out_queue: multiprocessing.Queue, dec_agents_in:multiprocessing.Queue, dec_agents_out:multiprocessing.Queue, render:bool=False):
         ticks_per_second = 1
         dec_data_in = {}
-        for (config,entities) in self.agents.values():
+        for (_,entities) in self.agents.values():
             ticks_per_second = entities[0].ticks()
             break
         ticks_limit = time_limit*ticks_per_second + 1 if time_limit > 0 else 0
@@ -74,7 +74,8 @@ class EntityManager:
                 self.initialize(data_in["random_seed"],o_shapes)
             agents_data = {
                 "status": [0,ticks_per_second],
-                "agents_shapes": self.get_agent_shapes()
+                "agents_shapes": self.get_agent_shapes(),
+                "agents_spins": self.get_agent_spins()
             }
             agents_queue.put(agents_data)
             t = 1
@@ -84,7 +85,8 @@ class EntityManager:
                     if arena_queue.qsize()>0: data_in = arena_queue.get()
                     agents_data = {
                         "status": [t,ticks_per_second],
-                        "agents_shapes": self.get_agent_shapes()
+                        "agents_shapes": self.get_agent_shapes(),
+                        "agents_spins": self.get_agent_spins()
                     }
                     if agents_queue.qsize() == 0: agents_queue.put(agents_data)
                 if arena_queue.qsize()>0: data_in = arena_queue.get()
@@ -93,7 +95,8 @@ class EntityManager:
                         entities[n].run(t,self.arena_shape,data_in["objects"]) # invoke the run method in a thread
                 agents_data = {
                     "status": [t,ticks_per_second],
-                    "agents_shapes": self.get_agent_shapes()
+                    "agents_shapes": self.get_agent_shapes(),
+                    "agents_spins": self.get_agent_spins()
                 }
                 detector_data = {
                     "agents": self.pack_detector_data()
@@ -117,7 +120,6 @@ class EntityManager:
             if run < num_runs:
                 if arena_queue.qsize() > 0: data_in = arena_queue.get()
             else: self.close()
-        gc.collect()
 
     def pack_detector_data(self) -> dict:
         out = {}
@@ -144,4 +146,13 @@ class EntityManager:
                 temp.append(entities[n].get_shape())
             shapes.update({entities[0].entity():temp})
         return shapes
+    
+    def get_agent_spins(self) -> dict:
+        spins = {}
+        for _,entities in self.agents.values():
+            temp = []
+            for n in range(len(entities)):
+                temp.append(entities[n].get_spin_system_data())
+            spins.update({entities[0].entity():temp})
+        return spins
     

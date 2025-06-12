@@ -280,6 +280,11 @@ class MovableAgent(StaticAgent):
             self.motion = MovableAgent.STOP
             self.last_motion_tick = 0
 
+    def get_spin_system_data(self):
+        if self.moving_behavior == "spin_model":
+            return self.spin_system.get_states(),self.spin_system.get_angles(),self.spin_system.get_external_field(),self.spin_system.get_avg_direction_of_activity()
+        return None
+    
     def get_max_absolute_velocity(self):
         return self.max_absolute_velocity
     
@@ -331,7 +336,7 @@ class MovableAgent(StaticAgent):
         if abs(distance.magnitude()) >= self.prev_goal_distance:
             self.last_motion_tick += 1
         self.prev_goal_distance = distance.magnitude()
-        if self.last_motion_tick > self.ticks_per_second*.5:
+        if self.last_motion_tick > self.ticks_per_second:
             self.last_motion_tick = 0
             self.goal_position = None
         if angle_to_goal >= self.max_angular_velocity:
@@ -362,11 +367,7 @@ class MovableAgent(StaticAgent):
                 sigma = effective_width
                 if sigma <= 0: sigma = 1e-6
                 weights = (sigma0 / sigma) * np.exp(-(angle_diffs ** 2) / (2 * (sigma**2)))
-                # if kappa[n] <= 0: kappa[n] = 1e-6
-                # weights = np.exp(kappa[n] * np.cos(angle_diffs))
-                # normalization = (2 * np.pi * i0(kappa[n]))
-                # weights /= normalization
-                weights *= strengths[n] #1/math.sqrt(dx**2 + dy**2)
+                weights *= strengths[n]
                 perception += np.repeat(weights, self.num_spins_per_group)
         perception -= self.perception_global_inhibition
         self.perception = perception
@@ -377,7 +378,7 @@ class MovableAgent(StaticAgent):
             self.prev_orientation = self.orientation
             self.update_visual_detection(objects)
             self.spin_system.update_external_field(self.perception)
-            self.spin_system.run_simulation(steps=1)
+            self.spin_system.run_spins(steps=1)
             angle_rad = self.spin_system.average_direction_of_activity()
             if angle_rad is not None:
                 angle_deg = normalize_angle(math.degrees(angle_rad))
@@ -389,15 +390,8 @@ class MovableAgent(StaticAgent):
                 self.orientation = self.orientation + delta_orientation
                 self.orientation.z = normalize_angle(self.orientation.z)
                 angle_rad = math.radians(self.orientation.z)
-                # inv_magnitude = self.spin_system.get_inverse_magnitude_of_activity()
-                # if inv_magnitude is not None and inv_magnitude > 0:
-                #     # Inverse of width could be used as scaling factor
-                #     scaling_factor = 1.0 / inv_magnitude
-                # else:
-                #     scaling_factor = 0.0 
                 width = self.spin_system.get_width_of_activity()
                 if width is not None and width > 0:
-                    # Inverse of width could be used as scaling factor
                     scaling_factor = 1.0 / width
                 else:
                     scaling_factor = 0.0 
