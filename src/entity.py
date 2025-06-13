@@ -374,60 +374,62 @@ class MovableAgent(StaticAgent):
 
     def run(self,tick,arena_shape,objects):
         if self.detection == "visual":
-            self.prev_position = self.position
-            self.prev_orientation = self.orientation
-            self.update_visual_detection(objects)
-            self.spin_system.update_external_field(self.perception)
-            self.spin_system.run_spins(steps=1)
-            angle_rad = self.spin_system.average_direction_of_activity()
-            if angle_rad is not None:
-                angle_deg = normalize_angle(math.degrees(angle_rad))
-                if angle_deg > self.max_angular_velocity:
-                    angle_deg = self.max_angular_velocity
-                elif angle_deg < -self.max_angular_velocity:
-                    angle_deg = -self.max_angular_velocity
-                delta_orientation = Vector3D(0,0,angle_deg)
-                self.orientation = self.orientation + delta_orientation
-                self.orientation.z = normalize_angle(self.orientation.z)
-                angle_rad = math.radians(self.orientation.z)
-                width = self.spin_system.get_width_of_activity()
-                if width is not None and width > 0:
-                    scaling_factor = 1.0 / width
-                else:
-                    scaling_factor = 0.0 
-                scaling_factor = np.clip(scaling_factor, 0.0, 1.0)
-                self.forward_vector = Vector3D(self.max_absolute_velocity*scaling_factor * math.cos(angle_rad),
-                                                self.max_absolute_velocity*scaling_factor * -math.sin(angle_rad),
-                                                0)
-                self.position = self.position + self.forward_vector
-                self.shape.rotate(delta_orientation.z)
-                self.shape.translate(self.position)
-                self.shape.translate_attachments(self.orientation.z)
-
+            self.spins_routine(objects)
         elif self.detection == "GPS":
-            if self.moving_behavior == "random_walk":
-                self.random_walk(tick)
-            elif self.moving_behavior == "random_way_point":
-                self.random_way_point(arena_shape)
-            else:
-                raise ValueError(f"Invalid moving behavior: {self.moving_behavior}")
-            self.prev_position = self.position
-            self.prev_orientation = self.orientation
-            delta_orientation = Vector3D(0,0,0)
-            if self.motion == MovableAgent.LEFT:
-                delta_orientation = Vector3D(0,0,self.max_angular_velocity)
-            elif self.motion == MovableAgent.RIGHT:
-                delta_orientation = Vector3D(0,0,-self.max_angular_velocity)
-            self.orientation = self.orientation + delta_orientation
+            self.GPS_routine(tick,arena_shape)
+        self.position = self.position + self.forward_vector
+        self.shape.rotate(self.delta_orientation.z)
+        self.shape.translate(self.position)
+        self.shape.translate_attachments(self.orientation.z)
+
+    def spins_routine(self,objects):
+        self.prev_position = self.position
+        self.prev_orientation = self.orientation
+        self.update_visual_detection(objects)
+        self.spin_system.update_external_field(self.perception)
+        self.spin_system.run_spins()
+        angle_rad = self.spin_system.average_direction_of_activity()
+        if angle_rad is not None:
+            angle_deg = normalize_angle(math.degrees(angle_rad))
+            if angle_deg > self.max_angular_velocity:
+                angle_deg = self.max_angular_velocity
+            elif angle_deg < -self.max_angular_velocity:
+                angle_deg = -self.max_angular_velocity
+            self.delta_orientation = Vector3D(0,0,angle_deg)
+            self.orientation = self.orientation + self.delta_orientation
             self.orientation.z = normalize_angle(self.orientation.z)
             angle_rad = math.radians(self.orientation.z)
-            self.forward_vector = Vector3D(self.max_absolute_velocity * math.cos(angle_rad),
-                                            self.max_absolute_velocity * -math.sin(angle_rad),
+            width = self.spin_system.get_width_of_activity()
+            if width is not None and width > 0:
+                scaling_factor = 1.0 / width
+            else:
+                scaling_factor = 0.0 
+            scaling_factor = np.clip(scaling_factor, 0.0, 1.0)
+            self.forward_vector = Vector3D(self.max_absolute_velocity*scaling_factor * math.cos(angle_rad),
+                                            self.max_absolute_velocity*scaling_factor * -math.sin(angle_rad),
                                             0)
-            self.position = self.position + self.forward_vector
-            self.shape.rotate(delta_orientation.z)
-            self.shape.translate(self.position)
-            self.shape.translate_attachments(self.orientation.z)
+
+    def GPS_routine(self,tick,arena_shape):
+        if self.moving_behavior == "random_walk":
+            self.random_walk(tick)
+        elif self.moving_behavior == "random_way_point":
+            self.random_way_point(arena_shape)
+        else:
+            raise ValueError(f"Invalid moving behavior: {self.moving_behavior}")
+        self.prev_position = self.position
+        self.prev_orientation = self.orientation
+        self.delta_orientation = Vector3D(0,0,0)
+        if self.motion == MovableAgent.LEFT:
+            self.delta_orientation = Vector3D(0,0,self.max_angular_velocity)
+        elif self.motion == MovableAgent.RIGHT:
+            self.delta_orientation = Vector3D(0,0,-self.max_angular_velocity)
+        self.orientation = self.orientation + self.delta_orientation
+        self.orientation.z = normalize_angle(self.orientation.z)
+        angle_rad = math.radians(self.orientation.z)
+        self.forward_vector = Vector3D(self.max_absolute_velocity * math.cos(angle_rad),
+                                        self.max_absolute_velocity * -math.sin(angle_rad),
+                                        0)
+
 
 def wrapped_cauchy_pp(random_generator,c:float) -> float:
     q = 0.5

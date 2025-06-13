@@ -48,6 +48,7 @@ class GUI_2D(QWidget):
         self.view.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.scene = QGraphicsScene()
         self.scene.setSceneRect(0, 0, 800, 800)
+        self.scene.setBackgroundBrush(QColor(240, 240, 240))
         self.view.setScene(self.scene)
         
         self.clicked_spin = None
@@ -55,7 +56,8 @@ class GUI_2D(QWidget):
         if self.on_click == "show_spins":
             self.figure, self.ax = plt.subplots(subplot_kw={"projection": "polar"}, figsize=(4, 4))
             self.canvas = FigureCanvas(self.figure)
-
+            self.canvas.setMinimumSize(320, 320)
+            self.canvas.setMaximumSize(320, 320)
         self._left_layout.addWidget(self.view)
         self._main_layout.addLayout(self._left_layout)
         self.setLayout(self._main_layout)
@@ -70,24 +72,28 @@ class GUI_2D(QWidget):
         self.agents_spins = None
         self.running = False
         self.step_requested = False
-        logging.info("2D GUI created successfully")
+        logging.info("GUI created successfully")
 
     def eventFilter(self, watched, event):
-        if watched == self.view.viewport() and event.type() == QEvent.Type.MouseButtonPress:
-            mouse_event = event if isinstance(event, QMouseEvent) else None
-            if mouse_event and mouse_event.button() == Qt.MouseButton.LeftButton:
-                pos = mouse_event.pos()
+        if event.type() == QEvent.Type.MouseButtonPress:
+            if isinstance(event, QMouseEvent) and event.button() == Qt.MouseButton.LeftButton:
+                pos = event.pos()
                 scene_pos = self.view.mapToScene(pos)
+                self.prev_clicked_spin = self.clicked_spin
                 self.clicked_spin = self.get_agent_at(scene_pos)
                 if self.clicked_spin:
-                    self._main_layout.removeWidget(self.canvas)
-                    self.canvas.setParent(None)
-                    if not self.canvas_visible:
+                    if not self.canvas_visible or self.clicked_spin != self.prev_clicked_spin:
                         self._main_layout.addWidget(self.canvas)
                         self.canvas_visible = True
-                    else:
+                    elif self.clicked_spin == self.prev_clicked_spin or self.clicked_spin == None:
+                        self.clicked_spin = None
                         self._main_layout.removeWidget(self.canvas)
+                        self.canvas.setParent(None)
                         self.canvas_visible = False
+                else:
+                    self._main_layout.removeWidget(self.canvas)
+                    self.canvas.setParent(None)
+                    self.canvas_visible = False
             return True
         return super().eventFilter(watched, event)
     
@@ -132,12 +138,10 @@ class GUI_2D(QWidget):
         self.ax.clear()
         if self.clicked_spin and self.agents_spins is not None:
             spin = self.agents_spins.get(self.clicked_spin[0])[self.clicked_spin[1]]
-            self.scene.setBackgroundBrush(QColor(240, 240, 240))
             group_mean_spins = spin[0].mean(axis=1)
             colors_spins = coolwarm((group_mean_spins))
-            group_mean_perception = (
-                spin[2].reshape(spin[1][1], spin[1][2]).mean(axis=1))
-            normalized_perception = (group_mean_perception + 1) / 2
+            group_mean_perception = spin[2].reshape(spin[1][1], spin[1][2]).mean(axis=1)
+            normalized_perception = (group_mean_perception + 1) * 0.5
             colors_perception = coolwarm(normalized_perception)
             angles = spin[1][0][::spin[1][2]]
             self.ax.bar(
@@ -169,9 +173,17 @@ class GUI_2D(QWidget):
                 alpha=0.9,
                 label="Perception",
             )
+            for deg, label in zip([0, 90, 180, 270], ["0°", "90°", "180°", "270°"]):
+                rad = math.radians(deg)
+                self.ax.text(
+                    rad, 2.5, label,
+                    ha="center", va="center", fontsize=10
+                )
             self.ax.set_yticklabels([])
             self.ax.set_xticks([])
             self.ax.grid(False)
+            self.ax.set_title(self.clicked_spin[0]+" "+str(self.clicked_spin[1]), fontsize=12, y = 1.15)
+            self.figure.tight_layout()
         self.canvas.draw()
 
     def update_data(self):
@@ -186,10 +198,9 @@ class GUI_2D(QWidget):
                 self.agents_shapes = data["agents_shapes"]
                 self.agents_spins = data["agents_spins"]
             self.update_scene()
-            if self.on_click == "show_spins" and self.canvas_visible: self.update_spins_plot()
+            if self.canvas_visible: self.update_spins_plot()
             self.update()
-            if self.step_requested:
-                self.step_requested = False
+            if self.step_requested: self.step_requested = False
 
     def draw_arena(self):
         view_width = self.view.viewport().width()
@@ -224,7 +235,6 @@ class GUI_2D(QWidget):
         self.scene.clear()
         self.draw_arena()
         if self.objects_shapes is not None:
-            self.scene.setBackgroundBrush(QColor(240, 240, 240))
             for _, entities in self.objects_shapes.items():
                 for entity in entities:
                     entity_vertices = [
@@ -238,8 +248,8 @@ class GUI_2D(QWidget):
                     entity_color = QColor(entity.color())
                     self.scene.addPolygon(entity_polygon, QPen(entity_color, .1), QBrush(entity_color))
         if self.agents_shapes is not None:
-            self.scene.setBackgroundBrush(QColor(240, 240, 240))
-            for _, entities in self.agents_shapes.items():
+            for key, entities in self.agents_shapes.items():
+                idx = 0
                 for entity in entities:
                     entity_vertices = [
                         QPointF(
@@ -251,6 +261,23 @@ class GUI_2D(QWidget):
                     entity_polygon = QPolygonF(entity_vertices)
                     entity_color = QColor(entity.color())
                     self.scene.addPolygon(entity_polygon, QPen(entity_color, .1), QBrush(entity_color))
+                    if self.clicked_spin is not None and self.clicked_spin[0]==key and self.clicked_spin[1]==idx:
+                        # Draw a circle that envelopes the entity_vertices
+                        xs = [point.x() for point in entity_vertices]
+                        ys = [point.y() for point in entity_vertices]
+                        centroid_x = sum(xs) / len(xs)
+                        centroid_y = sum(ys) / len(ys)
+                        # Compute max distance from centroid to any vertex
+                        max_radius = max(math.hypot(x - centroid_x, y - centroid_y) for x, y in zip(xs, ys))
+                        # Draw the circle
+                        circle = self.scene.addEllipse(
+                            centroid_x - max_radius,
+                            centroid_y - max_radius,
+                            2 * max_radius,
+                            2 * max_radius,
+                            QPen(QColor("white"), 1),
+                            QBrush(Qt.NoBrush)
+                        )
                     entity_attachments = entity.get_attachments()
                     for attachment in entity_attachments:
                         attachment_vertices = [
@@ -263,3 +290,5 @@ class GUI_2D(QWidget):
                         attachment_polygon = QPolygonF(attachment_vertices)
                         attachment_color = QColor(attachment.color())
                         self.scene.addPolygon(attachment_polygon, QPen(attachment_color, 1), QBrush(attachment_color))
+                    idx += 1
+

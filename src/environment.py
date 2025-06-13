@@ -10,9 +10,9 @@ class EnvironmentFactory():
 
     @staticmethod
     def create_environment(config_elem:Config):
-        if not config_elem.environment["parallel_experiments"] or config_elem.environment["render"]:
+        if not config_elem.environment.get("parallel_experiments",False) or config_elem.environment["render"]:
             return SingleProcessEnvironment(config_elem)
-        elif config_elem.environment["parallel_experiments"] and not config_elem.environment["render"]:
+        elif config_elem.environment.get("parallel_experiments",False) and not config_elem.environment["render"]:
             return MultiProcessEnvironment(config_elem)
         else:
             raise ValueError(f"Invalid environment configuration: {config_elem.environment['parallel_experiments']} {config_elem.environment['render']}")
@@ -26,6 +26,7 @@ class Environment():
         self.gui_id = config_elem.gui.get("_id","2D")
         self.render = [config_elem.environment.get("render",False),config_elem.gui]
         self.auto_close_gui = config_elem.environment.get("auto_close_gui",True)
+        self.collisions = config_elem.environment.get("collisions",True)
 
     def start(self):
         pass
@@ -70,7 +71,7 @@ class SingleProcessEnvironment(Environment):
             gui_control_queue = multiprocessing.Queue()
             arena = self.arena_init(exp)
             agents = self.agents_init(exp)
-            collision_detector = CollisionDetector(arena.get_shape())
+            collision_detector = CollisionDetector(arena.get_shape(),self.collisions)
             entity_manager = EntityManager(agents,arena.get_shape())
             arena_process = multiprocessing.Process(target=arena.run, args=(self.num_runs,self.time_limit,arena_queue,agents_queue,gui_in_queue,gui_out_arena_queue,dec_arena_in,gui_control_queue,self.render[0]))
             agents_process = multiprocessing.Process(target=entity_manager.run, args=(self.num_runs,self.time_limit,arena_queue,agents_queue,gui_out_agents_queue,dec_agents_in,dec_agents_out,self.render[0]))

@@ -1,6 +1,6 @@
 {
     "environment":{
-        "parallel_experiments": false,
+        "collisions": false,
         "ticks_per_second": 10,
         "time_limit": 0,
         "num_runs": 1,
@@ -33,7 +33,7 @@
                 "height": 0.2,
                 "diameter": 0.05,
                 "color": "green",
-                "strength": [[5, 5.5]],
+                "strength": [[5, 5]],
                 "uncertainty": [[0.1]]
             }
         },
@@ -48,13 +48,13 @@
                 "color": "blue",
                 "detection": "visual",
                 "moving_behavior":"spin_model",
-                "perception_width": [0.25],
+                "perception_width": [0.15],
                 "num_groups": [32],
                 "num_spins_per_group": [10],
                 "perception_global_inhibition": [0.5],
-                "T": [0.1],
-                "J": [4],
-                "nu": [0.2],
+                "T": [0.07],
+                "J": [0.5],
+                "nu": [0.1],
                 "p_spin_up": [0.5],
                 "time_delay": [0],
                 "dynamics": ["metropolis"]

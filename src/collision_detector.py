@@ -2,8 +2,9 @@ import multiprocessing
 from geometry_utils.vector3D import Vector3D
 
 class CollisionDetector:
-    def __init__(self,arena_shape):
+    def __init__(self,arena_shape,collisions):
         self.arena_shape = arena_shape
+        self.collisions = collisions
 
     def run(self,dec_agents_in:multiprocessing.Queue,dec_agents_out:multiprocessing.Queue,dec_arena_in:multiprocessing.Queue):
         self.agents, self.objects = {},{}
@@ -25,48 +26,49 @@ class CollisionDetector:
                         contra_move_sum = Vector3D()
                         contra_norm_sum = Vector3D()
                         separations = []
-                        for dshapes, dvelocities, dvectors, dpositions, dnames in self.agents.values():
-                            for m in range(len(dshapes)):
-                                dshape = dshapes[m]
-                                # dmax_velocity = dvelocities[m]
-                                dforward_vector = dvectors[m]
-                                dposition = dpositions[m]
-                                dname = dnames[m]
-                                delta = Vector3D(position.x - dposition.x, position.y - dposition.y, 0)
-                                distance = shape.get_radius() + dshape.get_radius()
-                                actual_distance = delta.magnitude()
-                                if name != dname and actual_distance <= distance:
-                                    overlap = shape.check_overlap(dshape)
-                                    if overlap[0]:
-                                        if correction is None:
-                                            correction = position
-                                        collision_normal = get_collision_normal(overlap[1], dshape, max_velocity)
-                                        velocity_projection = collision_normal - forward_vector + dforward_vector
-                                        contra_norm_sum += collision_normal
-                                        contra_move_sum += dforward_vector
-                                        penetration_depth = distance - actual_distance
-                                        separations.append((delta.normalize(), penetration_depth*.1))
-                                        correction = correction + velocity_projection
-                        for dshapes, dpositions in self.objects.values():
-                            for m in range(len(dshapes)):
-                                dshape = dshapes[m]
-                                dposition = dpositions[m]
-                                delta = Vector3D(position.x - dposition.x, position.y - dposition.y, 0)
-                                distance = shape.get_radius() + dshape.get_radius()
-                                actual_distance = delta.magnitude()
-                                if actual_distance <= distance:
-                                    overlap = shape.check_overlap(dshape)
-                                    if overlap[0]:
-                                        if correction is None:
-                                            correction = position
-                                        collision_normal = get_collision_normal(overlap[1], dshape, max_velocity)
-                                        velocity_projection = collision_normal - forward_vector
-                                        contra_norm_sum += collision_normal
-                                        penetration_depth = distance - actual_distance
-                                        separations.append((delta.normalize(), penetration_depth*.1))
-                                        correction = correction + velocity_projection
-                        if correction is not None:
-                            shape.translate(correction)
+                        if self.collisions:
+                            for dshapes, dvelocities, dvectors, dpositions, dnames in self.agents.values():
+                                for m in range(len(dshapes)):
+                                    dshape = dshapes[m]
+                                    # dmax_velocity = dvelocities[m]
+                                    dforward_vector = dvectors[m]
+                                    dposition = dpositions[m]
+                                    dname = dnames[m]
+                                    delta = Vector3D(position.x - dposition.x, position.y - dposition.y, 0)
+                                    distance = shape.get_radius() + dshape.get_radius()
+                                    actual_distance = delta.magnitude()
+                                    if name != dname and actual_distance <= distance:
+                                        overlap = shape.check_overlap(dshape)
+                                        if overlap[0]:
+                                            if correction is None:
+                                                correction = position
+                                            collision_normal = get_collision_normal(overlap[1], dshape, max_velocity)
+                                            velocity_projection = collision_normal - forward_vector + dforward_vector
+                                            contra_norm_sum += collision_normal
+                                            contra_move_sum += dforward_vector
+                                            penetration_depth = distance - actual_distance
+                                            separations.append((delta.normalize(), penetration_depth*.1))
+                                            correction = correction + velocity_projection
+                            for dshapes, dpositions in self.objects.values():
+                                for m in range(len(dshapes)):
+                                    dshape = dshapes[m]
+                                    dposition = dpositions[m]
+                                    delta = Vector3D(position.x - dposition.x, position.y - dposition.y, 0)
+                                    distance = shape.get_radius() + dshape.get_radius()
+                                    actual_distance = delta.magnitude()
+                                    if actual_distance <= distance:
+                                        overlap = shape.check_overlap(dshape)
+                                        if overlap[0]:
+                                            if correction is None:
+                                                correction = position
+                                            collision_normal = get_collision_normal(overlap[1], dshape, max_velocity)
+                                            velocity_projection = collision_normal - forward_vector
+                                            contra_norm_sum += collision_normal
+                                            penetration_depth = distance - actual_distance
+                                            separations.append((delta.normalize(), penetration_depth*.1))
+                                            correction = correction + velocity_projection
+                            if correction is not None:
+                                shape.translate(correction)
                         overlap = shape.check_overlap(self.arena_shape)
                         if overlap[0]:
                             if correction is None:
