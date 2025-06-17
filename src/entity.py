@@ -255,7 +255,9 @@ class MovableAgent(StaticAgent):
         self.prev_goal_distance = 0
         self.detection = config_elem.get("detection","GPS")
         self.moving_behavior = config_elem.get("moving_behavior","random_walk")
+        self.pre_run = config_elem.get("spin_pre_run",False)
         if self.detection in ("visual"):
+            self.spin_pre_run_steps = config_elem.get("spin_pre_run_steps",1000)
             self.perception_width = config_elem.get("perception_width",0.1)
             self.num_groups = config_elem.get("num_groups",32)
             self.num_spins_per_group = config_elem.get("num_spins_per_group",10)
@@ -350,6 +352,14 @@ class MovableAgent(StaticAgent):
             self.shape.translate(self.position)
             self.shape.translate_attachments(self.orientation.z)
     
+    def spin_pre_run(self,objects):
+        if self.pre_run:
+            self.update_visual_detection(objects)
+            for _ in range(self.spin_pre_run_steps):
+                self.spin_system.step(timedelay=False)
+            self.spin_system.set_p_spin_up(np.mean(self.spin_system.get_states()))
+            self.spin_system.reset_spins()
+
     def update_visual_detection(self,objects):
         perception = np.zeros(self.num_groups * self.num_spins_per_group)
         for _,(shapes,positions,strengths,uncertainties) in objects.items():

@@ -7,7 +7,7 @@ class EntityManager:
         self.agents = agents
         self.arena_shape = arena_shape
 
-    def initialize(self,random_seed,object_shapes):
+    def initialize(self,random_seed,objects):
         min_v  = self.arena_shape.min_vert()
         max_v  = self.arena_shape.max_vert()
         for (_,entities) in self.agents.values():
@@ -37,7 +37,7 @@ class EntityManager:
                                 if m!=n and entities[n].get_shape().check_overlap(entities[m].get_shape())[0]:
                                     done = False
                                     break
-                            for shapes in object_shapes.values():
+                            for shapes,_,_,_ in objects.values():
                                 for m in range(len(shapes)):
                                     if entities[n].get_shape().check_overlap(shapes[m])[0]:
                                         done = False
@@ -53,6 +53,7 @@ class EntityManager:
                     position = entities[n].get_start_position()
                     entities[n].set_start_position(Vector3D(position.x,position.y, (abs(entities[n].get_shape().min_vert().z))))
                 entities[n].shape.translate_attachments(entities[n].orientation.z)
+                entities[n].spin_pre_run(objects)
 
     def close(self):
         pass
@@ -67,11 +68,8 @@ class EntityManager:
         for run in range(1, num_runs + 1):
             while arena_queue.qsize() == 0: pass
             data_in = arena_queue.get()
-            o_shapes = {}
-            for k, item in data_in["objects"].items():
-                o_shapes.update({k:item[0]})
             if data_in["status"][0]==0:
-                self.initialize(data_in["random_seed"],o_shapes)
+                self.initialize(data_in["random_seed"],data_in["objects"])
             agents_data = {
                 "status": [0,ticks_per_second],
                 "agents_shapes": self.get_agent_shapes(),

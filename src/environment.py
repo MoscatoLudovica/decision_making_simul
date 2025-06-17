@@ -122,7 +122,7 @@ class SingleProcessEnvironment(Environment):
                         agents_process.join()
                         gui_process.join()
                         raise RuntimeError(f"GUI process exited with code {gui_process.exitcode}")
-                    if psutil.Process(gui_process.pid).status() == psutil.STATUS_ZOMBIE or psutil.Process(gui_process.pid).status() == psutil.STATUS_DEAD:
+                    if killed == 0 and (psutil.Process(gui_process.pid).status() == psutil.STATUS_ZOMBIE or psutil.Process(gui_process.pid).status() == psutil.STATUS_DEAD):
                         gui_out_arena_queue.put({"status": "end"})
                         gui_out_agents_queue.put({"status": "end"})
                         killed = 1

@@ -1,7 +1,7 @@
 {
     "environment":{
         "collisions": false,
-        "ticks_per_second": 3,
+        "ticks_per_second": 1,
         "time_limit": 0,
         "num_runs": 1,
         "render": true,
@@ -39,7 +39,9 @@
         "agents":{
             "movable_0":{
                 "ticks_per_second": 10,
-                "number": [1],
+                "spin_pre_run": true,
+                "spin_pre_run_steps": 500,
+                "number": [5],
                 "position": [[0, 0.4, 0]],
                 "shape": "cylinder",
                 "linear_velocity": 0.01,
@@ -49,14 +51,14 @@
                 "color": "blue",
                 "detection": "visual",
                 "moving_behavior":"spin_model",
-                "perception_width": [0.2],
+                "perception_width": [0.5],
                 "num_groups": [32],
                 "num_spins_per_group": [10],
                 "perception_global_inhibition": [1],
-                "T": [0.05],
-                "J": [1],
-                "nu": [0.1],
-                "p_spin_up": [0.5],
+                "T": [0.2],
+                "J": [16],
+                "nu": [0.5],
+                "p_spin_up": [0.05],
                 "time_delay": [0],
                 "dynamics": ["metropolis"]
             }

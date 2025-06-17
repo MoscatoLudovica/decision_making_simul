@@ -13,15 +13,18 @@ class SpinSystem:
         self.p_spin_up = p_spin_up  # Probability of spin being 1 (up)
         self.spins = np.array([[1 if Random.uniform(self.random_generator, 0, 1) < self.p_spin_up else 0
                                 for _ in range(self.num_spins_per_group)] for _ in range(self.num_groups)])
-        self.time_delay = time_delay
         self.spins_history = np.array([self.spins])
+        self.time_delay = time_delay
         self.dynamics = dynamics # Dynamics type: 'metropolis' or 'glauber'
         # Assigning one unique angle to each group, replicated for each spin
         group_angles = np.linspace(0, 2 * math.pi, num_groups, endpoint=False)
         self.angles = np.repeat(group_angles, self.num_spins_per_group)  # This ensures angles are 1D
         self.external_field = np.zeros(self.num_groups * self.num_spins_per_group)  # Placeholder for external field strengths
         self.avg_direction = None  # No active spins
-        
+    
+    def set_p_spin_up(self,p_spin_up):
+        self.p_spin_up = p_spin_up
+
     def calculate_hamiltonian(self, state):
         """ Calculate the Hamiltonian using the provided state or the historical state if none provided. """
         state_to_use = state  # Use the provided state
@@ -183,6 +186,10 @@ class SpinSystem:
             return circ_std
         return None  # Not enough active spins to compute width
     
+    def reset_spins(self):
+        self.spins = np.array([[1 if Random.uniform(self.random_generator, 0, 1) < self.p_spin_up else 0
+                                for _ in range(self.num_spins_per_group)] for _ in range(self.num_groups)])
+        self.spins_history = np.array([self.spins])
 
     def update_external_field(self, perceptual_outputs):
         """ Update external magnetic field strengths based on perceptual system outputs. """
