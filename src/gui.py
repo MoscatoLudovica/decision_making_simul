@@ -13,7 +13,7 @@ class GuiFactory():
         if config_elem.get("_id") in ("2D","abstract"):
             return QApplication([]),GUI_2D(config_elem,arena_vertices,arena_color,gui_in_queue,gui_control_queue)
         else:
-            raise ValueError(f"Invalid gui type: {config_elem.get('_id')} valid types are '2D' or '3D'")
+            raise ValueError(f"Invalid gui type: {config_elem.get('_id')} valid types are '2D' or 'abstract'")
 
 class GUI_2D(QWidget):
     def __init__(self, config_elem: dict,arena_vertices,arena_color,gui_in_queue,gui_control_queue):
@@ -53,6 +53,10 @@ class GUI_2D(QWidget):
         
         self.clicked_spin = None
         self.canvas_visible = False
+        self.spins_bars = None
+        self.perception_bars = None
+        self.arrow = None
+        self.angle_labels = []
         if self.on_click == "show_spins":
             self.figure, self.ax = plt.subplots(subplot_kw={"projection": "polar"}, figsize=(4, 4))
             self.canvas = FigureCanvas(self.figure)
@@ -135,56 +139,50 @@ class GUI_2D(QWidget):
             self.step_requested = True
 
     def update_spins_plot(self):
-        self.ax.clear()
-        if self.clicked_spin and self.agents_spins is not None:
-            spin = self.agents_spins.get(self.clicked_spin[0])[self.clicked_spin[1]]
-            group_mean_spins = spin[0].mean(axis=1)
-            colors_spins = coolwarm((group_mean_spins))
-            group_mean_perception = spin[2].reshape(spin[1][1], spin[1][2]).mean(axis=1)
-            normalized_perception = (group_mean_perception + 1) * 0.5
-            colors_perception = coolwarm(normalized_perception)
-            angles = spin[1][0][::spin[1][2]]
-            self.ax.bar(
-                angles,
-                0.75,   # All bars have height=1
-                width=2 * math.pi / spin[1][1],
-                bottom=0.75,             # Shift ring inward
-                color=colors_spins,
-                edgecolor="black",
-                alpha=0.9,
-                #label="Spins",
+        if not (self.clicked_spin and self.agents_spins is not None):
+            return
+        spin = self.agents_spins.get(self.clicked_spin[0])[self.clicked_spin[1]]
+        group_mean_spins = spin[0].mean(axis=1)
+        colors_spins = coolwarm(group_mean_spins)
+        group_mean_perception = spin[2].reshape(spin[1][1], spin[1][2]).mean(axis=1)
+        normalized_perception = (group_mean_perception + 1) * 0.5
+        colors_perception = coolwarm(normalized_perception)
+        angles = spin[1][0][::spin[1][2]]
+        width = 2 * math.pi / spin[1][1]
+        if self.spins_bars is None or self.perception_bars is None:
+            self.ax.clear()
+            self.spins_bars = self.ax.bar(
+                angles, 0.75, width=width, bottom=0.75,
+                color=colors_spins, edgecolor="black", alpha=0.9
             )
-            avg_angle = spin[3]
-            if avg_angle is not None:
-                # Place an arrow near the inner ring
-                self.ax.annotate(
-                    "",
-                    xy=(avg_angle, 0.5),   # End of the arrow
-                    xytext=(avg_angle, 0.1),  # Start of the arrow
-                    arrowprops=dict(facecolor="black", arrowstyle="->", lw=2),
-                )
-            self.ax.bar(
-                angles,
-                0.5,
-                width=2 * math.pi / spin[1][1],
-                bottom=1.6,
-                color=colors_perception,
-                edgecolor="black",
-                alpha=0.9,
-                label="Perception",
+            self.perception_bars = self.ax.bar(
+                angles, 0.5, width=width, bottom=1.6,
+                color=colors_perception, edgecolor="black", alpha=0.9
             )
+            self.angle_labels = []
             for deg, label in zip([0, 90, 180, 270], ["0°", "90°", "180°", "270°"]):
                 rad = math.radians(deg)
-                self.ax.text(
-                    rad, 2.5, label,
-                    ha="center", va="center", fontsize=10
-                )
+                txt = self.ax.text(rad, 2.5, label, ha="center", va="center", fontsize=10)
+                self.angle_labels.append(txt)
             self.ax.set_yticklabels([])
             self.ax.set_xticks([])
             self.ax.grid(False)
-            self.ax.set_title(self.clicked_spin[0]+" "+str(self.clicked_spin[1]), fontsize=12, y = 1.15)
-            self.figure.tight_layout()
-        self.canvas.draw()
+        else:
+            for bar, color in zip(self.spins_bars, colors_spins):
+                bar.set_color(color)
+            for bar, color in zip(self.perception_bars, colors_perception):
+                bar.set_color(color)
+        avg_angle = spin[3]
+        if avg_angle is not None:
+            if self.arrow is not None:
+                self.arrow.remove()
+            self.arrow = self.ax.annotate(
+                "", xy=(avg_angle, 0.5), xytext=(avg_angle, 0.1),
+                arrowprops=dict(facecolor="black", arrowstyle="->", lw=2),
+            )
+        self.ax.set_title(self.clicked_spin[0]+" "+str(self.clicked_spin[1]), fontsize=12, y=1.15)
+        self.figure.tight_layout()
+        self.canvas.draw_idle()
 
     def update_data(self):
         if self.running or self.step_requested:
@@ -200,7 +198,7 @@ class GUI_2D(QWidget):
             self.update_scene()
             if self.canvas_visible: self.update_spins_plot()
             self.update()
-            if self.step_requested: self.step_requested = False
+            self.step_requested = False
 
     def draw_arena(self):
         view_width = self.view.viewport().width()

@@ -1,6 +1,5 @@
-import math
+import math, json, hashlib
 import numpy as np
-# from scipy.special import i0
 from random import Random
 from geometry_utils.vector3D import Vector3D
 from bodies.shapes3D import Shape3DFactory
@@ -60,8 +59,10 @@ class Agent(Entity):
     
     def ticks(self): return self.ticks_per_second
     
-    def set_random_generator(self,random_seed):
-        seed = random_seed + int(self._id) + (int(self.entity_type.split('_')[-1]) + 1)
+    def set_random_generator(self,config,random_seed):
+        config_str = json.dumps(config, sort_keys=True)
+        config_seed = int(hashlib.sha256(config_str.encode()).hexdigest(), 16) % (2**32)
+        seed = int(hashlib.sha256(f"{config_seed}_{random_seed}_{int(self.entity_type.split('_')[-1])}_{int(self._id)}".encode()).hexdigest(), 16) % (2**32)
         self.random_generator.seed(seed)
 
     def get_random_generator(self):
@@ -233,8 +234,6 @@ class StaticAgent(Agent):
 class MovableObject(StaticObject):
     def __init__(self,entity_type:str, config_elem:dict,_id:int=0):
         super().__init__(entity_type,config_elem,_id)
-        # self.max_absolute_velocity = 0.01
-        # self.max_angular_velocity = 0.01
 
 class MovableAgent(StaticAgent):
 
@@ -246,8 +245,8 @@ class MovableAgent(StaticAgent):
     def __init__(self,entity_type:str, config_elem:dict,_id:int=0):
         super().__init__(entity_type,config_elem,_id)
         self.config_elem = config_elem
-        self.max_absolute_velocity = 0.01 / self.ticks_per_second
-        self.max_angular_velocity = 45 / self.ticks_per_second
+        self.max_absolute_velocity = float(config_elem.get("linear_velocity",0.01)) / self.ticks_per_second
+        self.max_angular_velocity = int(config_elem.get("angular_velocity",360)) / self.ticks_per_second
         self.forward_vector = Vector3D()
         self.goal_position = None
         self.prev_orientation = Vector3D()
@@ -327,7 +326,6 @@ class MovableAgent(StaticAgent):
     def random_way_point(self,arena_shape):
         if self.goal_position == None or math.sqrt((self.position.x - self.goal_position.x)**2 + (self.position.y - self.goal_position.y)**2) <= .001:
             self.goal_position = self.shape._get_random_point_inside_shape(self.random_generator, arena_shape)
-        # Compute angle from agent to object in world coordinates
         dx = self.goal_position.x - self.position.x
         dy = self.goal_position.y - self.position.y
         angle_to_goal = math.degrees(math.atan2(-dy, dx))
@@ -429,7 +427,6 @@ class MovableAgent(StaticAgent):
         self.forward_vector = Vector3D(self.max_absolute_velocity * math.cos(angle_rad),
                                         self.max_absolute_velocity * -math.sin(angle_rad),
                                         0)
-
 
 def wrapped_cauchy_pp(random_generator,c:float) -> float:
     q = 0.5

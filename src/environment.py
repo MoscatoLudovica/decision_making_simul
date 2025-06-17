@@ -27,6 +27,8 @@ class Environment():
         self.render = [config_elem.environment.get("render",False),config_elem.gui]
         self.auto_close_gui = config_elem.environment.get("auto_close_gui",True)
         self.collisions = config_elem.environment.get("collisions",True)
+        if not self.render[0] and self.time_limit==0:
+            raise Exception("Invalid configuration: infinite experiment with no GUI.")
 
     def start(self):
         pass

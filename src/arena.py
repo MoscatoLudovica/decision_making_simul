@@ -31,7 +31,8 @@ class Arena():
         self.objects = {object_type: (config_elem.environment.get("objects",{}).get(object_type),[]) for object_type in config_elem.environment.get("objects",{}).keys()}
         self.agents_shapes = {}
         self.agents_spins = {}
-        self.data_handling = DataHandlingFactory.create_data_handling(config_elem)
+        self.data_handling = None
+        if config_elem.results.get("save",False): self.data_handling = DataHandlingFactory.create_data_handling(config_elem)
 
     def get_id(self):
         return self._id
@@ -96,6 +97,8 @@ class SolidArena(Arena):
     
     def initialize(self):
         super().initialize()
+        min_v  = self.shape.min_vert()
+        max_v  = self.shape.max_vert()
         for (config,entities) in self.objects.values():
             for n in range(len(entities)):
                 entities[n].set_position(Vector3D(999,0,0),False)
@@ -110,8 +113,6 @@ class SolidArena(Arena):
                     done = False
                     while not done and count < 500:
                         done = True
-                        min_v  = self.shape.min_vert()
-                        max_v  = self.shape.max_vert()
                         rand_pos = Vector3D(Random.uniform(self.random_generator,min_v.x,max_v.x),
                                             Random.uniform(self.random_generator,min_v.y,max_v.y),
                                             abs(entities[n].get_shape().min_vert().z)) 
@@ -173,10 +174,12 @@ class SolidArena(Arena):
             if render:
                 gui_in_queue.put({**arena_data, "agents_shapes": self.agents_shapes, "agents_spins": self.agents_spins})
             arena_queue.put({**arena_data, "random_seed": self.random_seed})
+
             while agents_queue.qsize() == 0: pass
             data_in = agents_queue.get()
             self.agents_shapes = data_in["agents_shapes"]
             self.agents_spins = data_in["agents_spins"]
+            if self.data_handling is not None: self.data_handling.new_run(run,self.agents_shapes,self.agents_spins)
             t = 1
             running = False if render else True
             step_mode = False
@@ -197,8 +200,7 @@ class SolidArena(Arena):
                     "objects": self.pack_objects_data()
                 }
                 if running or step_mode:
-                    if not render:
-                        print(f"\rarena_ticks {t}", end='', flush=True)
+                    if not render: print(f"\rarena_ticks {t}", end='', flush=True)
                     arena_queue.put(arena_data)
                     while data_in["status"][0]/data_in["status"][1] < t/self.ticks_per_second:
                         if agents_queue.qsize()>0: data_in = agents_queue.get()
@@ -216,6 +218,7 @@ class SolidArena(Arena):
                     if agents_queue.qsize()>0: data_in = agents_queue.get()
                     self.agents_shapes = data_in["agents_shapes"]
                     self.agents_spins = data_in["agents_spins"]
+                    if self.data_handling is not None: self.data_handling.save(self.agents_shapes,self.agents_spins)
                     if render:
                         gui_in_queue.put({**arena_data, "agents_shapes": self.agents_shapes, "agents_spins": self.agents_spins})
                         if gui_out_queue.qsize() > 0:
@@ -230,11 +233,17 @@ class SolidArena(Arena):
             if run < num_runs:
                 self.increment_seed()
                 self.reset()
+                if not render: print("")
+                if self.data_handling is not None: self.data_handling.close(self.agents_shapes)
             else:
                 self.close()
+                if not render: print("")
+                if self.data_handling is not None: self.data_handling.close(self.agents_shapes)
         
     def reset(self):
         super().reset()
+        min_v  = self.shape.min_vert()
+        max_v  = self.shape.max_vert()
         for (config,entities) in self.objects.values():
             for n in range(len(entities)):
                 entities[n].set_position(Vector3D(999,0,0),False)
@@ -250,8 +259,6 @@ class SolidArena(Arena):
                     done = False
                     while not done and count < 500:
                         done = True
-                        min_v  = self.shape.min_vert()
-                        max_v  = self.shape.max_vert()
                         rand_pos = Vector3D(Random.uniform(self.random_generator,min_v.x,max_v.x),
                                             Random.uniform(self.random_generator,min_v.y,max_v.y),
                                             abs(entities[n].get_shape().min_vert().z)) 

@@ -8,12 +8,14 @@ class EntityManager:
         self.arena_shape = arena_shape
 
     def initialize(self,random_seed,object_shapes):
-        for (config,entities) in self.agents.values():
+        min_v  = self.arena_shape.min_vert()
+        max_v  = self.arena_shape.max_vert()
+        for (_,entities) in self.agents.values():
             for n in range(len(entities)):
                 entities[n].set_position(Vector3D(999,0,0),False)
         for (config,entities) in self.agents.values():
             for n in range(len(entities)):
-                entities[n].set_random_generator(random_seed)
+                entities[n].set_random_generator(config,random_seed)
                 entities[n].reset()
                 if not entities[n].get_orientation_from_dict():
                     rand_angle = Random.uniform(entities[n].get_random_generator(),0.0,360.0)
@@ -24,8 +26,6 @@ class EntityManager:
                     while not done and count < 500:
                         done = True
                         entities[n].to_origin()
-                        min_v  = self.arena_shape.min_vert()
-                        max_v  = self.arena_shape.max_vert()
                         rand_pos = Vector3D(Random.uniform(entities[n].get_random_generator(),min_v.x,max_v.x),
                                             Random.uniform(entities[n].get_random_generator(),min_v.y,max_v.y),
                                             abs(entities[n].get_shape().min_vert().z)) 
@@ -51,7 +51,7 @@ class EntityManager:
                 else:
                     entities[n].to_origin()
                     position = entities[n].get_start_position()
-                    entities[n].set_start_position(Vector3D(position.x,position.y,position.z + (abs(entities[n].get_shape().min_vert().z))))
+                    entities[n].set_start_position(Vector3D(position.x,position.y, (abs(entities[n].get_shape().min_vert().z))))
                 entities[n].shape.translate_attachments(entities[n].orientation.z)
 
     def close(self):

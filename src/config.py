@@ -119,18 +119,11 @@ class Config:
         except KeyError:
             raise ValueError("The 'agents' field is required with dictionary entries 'static_#' or 'movable_#'")
 
-        # Controlli su results e gui
-        if 'results' not in environment:
-            raise ValueError("The 'results' field is required in the environment")
-        for field in ["_id", "save"]:
-            if field not in environment['results']:
-                raise ValueError(f"The '{field}' field is required in the results")
         if 'gui' not in environment:
             raise ValueError("The 'gui' field is required in the environment")
         if "_id" not in environment['gui']:
             raise ValueError("The '_id' field is required in the gui")
 
-        # Prodotto cartesiano tra tutte le combinazioni di agenti e oggetti
         agent_keys = list(agents.keys())
         object_keys = list(objects.keys())
         agent_combos = list(itertools.product(*[agents[k] for k in agent_keys])) if agent_keys else [()]
@@ -145,7 +138,7 @@ class Config:
                             "time_limit": environment.get("time_limit", 500),
                             "num_runs": environment.get("num_runs", 1),
                             "render": environment.get("render", False),
-                            "results": environment.get("results"),
+                            "results": environment.get("results",{}),
                             "gui": environment.get("gui"),
                             "arena": arena_value,
                             "objects": {},
