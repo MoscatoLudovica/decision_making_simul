@@ -1,15 +1,16 @@
 import math
 from geometry_utils.vector3D import Vector3D
 
+_PI = math.pi
 class Shape3DFactory:
     @staticmethod
-    def create_shape(_object:str,shape_type:str, config_elem:dict):
+    def create_shape(_object:str, shape_type:str, config_elem:dict):
         if shape_type == "sphere":
-            return Sphere(_object,shape_type,config_elem)
-        elif shape_type in ("square","cube","rectangle","cuboid"):
-            return Cuboid(_object,shape_type,config_elem)
-        elif shape_type in ("circle","cylinder"):
-            return Cylinder(_object,shape_type,config_elem)
+            return Sphere(_object, shape_type, config_elem)
+        elif shape_type in ("square", "cube", "rectangle", "cuboid"):
+            return Cuboid(_object, shape_type, config_elem)
+        elif shape_type in ("circle", "cylinder"):
+            return Cylinder(_object, shape_type, config_elem)
         elif shape_type == "point" or shape_type == "none":
             return Shape(config_elem)
         else:
@@ -17,43 +18,51 @@ class Shape3DFactory:
 
 class Shape:
     dense_shapes = ["sphere", "cube", "cuboid", "cylinder"]
-    flat_shapes = ["circle","square", "rectangle"]
+    flat_shapes = ["circle", "square", "rectangle"]
     no_shapes = ["point", "none"]
+
     def __init__(self, config_elem:dict, center: Vector3D = Vector3D()):
-        self.center = Vector3D(center.x,center.y,center.z)
+        self.center = Vector3D(center.x, center.y, center.z)
         self._object = "arena"
         self._id = "point"
         self._color = config_elem.get("color", "white")
         self.vertices_list = []
         self.attachments = []
-        
+
     def add_attachment(self, attachment):
         self.attachments.append(attachment)
-        
+
     def get_attachments(self):
         return self.attachments
 
-    def translate_attachments(self,angle:float):
+    def translate_attachments(self, angle: float):
         max_v = self.max_vert()
         angle_rad = math.radians(angle)
+        cos_a = math.cos(angle_rad)
+        sin_a = math.sin(angle_rad)
+        cx, cy = self.center.x, self.center.y
+        dx = max_v.x - cx - .01
+        dy = max_v.y - cy - .01
         for attachment in self.attachments:
-            attachment.translate(Vector3D(self.center.x + (((max_v.x - self.center.x) - .01) * math.cos(angle_rad)),
-                                          self.center.y + (((max_v.y - self.center.y) - .01) * -math.sin(angle_rad)),
-                                          max_v.z))
+            attachment.translate(Vector3D(
+                cx + dx * cos_a,
+                cy + dy * -sin_a,
+                max_v.z
+            ))
 
     def color(self) -> str:
         return self._color
-    
-    def set_color(self,color:str):
+
+    def set_color(self, color: str):
         self._color = color
-    
+
     def center_of_mass(self) -> Vector3D:
         return self.center
 
     def vertices(self) -> list:
         return self.vertices_list
-    
-    def translate(self, new_center:Vector3D):
+
+    def translate(self, new_center: Vector3D):
         self.center = new_center
         self.set_vertices()
 
@@ -64,23 +73,23 @@ class Shape:
         pass
 
     def check_overlap(self, _shape):
-        for vertex in self.vertices():
+        # Usa direttamente self.vertices_list invece di self.vertices()
+        for vertex in self.vertices_list:
             if _shape._object == "arena":
                 if not self._is_point_inside_shape(vertex, _shape):
                     return True, vertex
             else:
                 if self._is_point_inside_shape(vertex, _shape):
                     return True, vertex
-        for vertex in _shape.vertices():
+        for vertex in _shape.vertices_list:
             if self._is_point_inside_shape(vertex, self):
                 return True, vertex
         return False, Vector3D()
 
     def _get_random_point_inside_shape(self, random_generator, arena_shape):
-        if isinstance(arena_shape, (Cylinder,Sphere)):
-            # Generate a random point inside the circle (base of the cylinder)
-            angle = random_generator.uniform(0, 2 * math.pi)
-            r = arena_shape.radius * math.sqrt(random_generator.uniform(0, 1)) 
+        if isinstance(arena_shape, (Cylinder, Sphere)):
+            angle = random_generator.uniform(0, 2 * _PI)
+            r = arena_shape.radius * math.sqrt(random_generator.uniform(0, 1))
             x = arena_shape.center.x + r * math.cos(angle)
             y = arena_shape.center.y + r * math.sin(angle)
             z = arena_shape.center.z
@@ -88,85 +97,103 @@ class Shape:
         else:
             min_v = arena_shape.min_vert()
             max_v = arena_shape.max_vert()
-            if isinstance(self, (Cylinder,Sphere)):
+            if isinstance(self, (Cylinder, Sphere)):
                 tmp = self.get_radius()
                 min_v += Vector3D(tmp, tmp, tmp)
                 max_v -= Vector3D(tmp, tmp, tmp)
             else:
-                tmp = self.center - self.max_vert() 
+                tmp = self.center - self.max_vert()
                 min_v += tmp
                 max_v -= tmp
-            return Vector3D(random_generator.uniform(min_v.x, max_v.x),
-                            random_generator.uniform(min_v.y, max_v.y),
-                            random_generator.uniform(min_v.z, max_v.z))
-    
+            return Vector3D(
+                random_generator.uniform(min_v.x, max_v.x),
+                random_generator.uniform(min_v.y, max_v.y),
+                random_generator.uniform(min_v.z, max_v.z)
+            )
+
     def _is_point_inside_shape(self, point, shape):
         if isinstance(shape, Cylinder):
-            distance = math.sqrt((point.x - shape.center.x) ** 2 +
-                                (point.y - shape.center.y) ** 2 +
-                                (point.z - shape.center.z) ** 2)
+            dx = point.x - shape.center.x
+            dy = point.y - shape.center.y
+            dz = point.z - shape.center.z
+            distance = math.sqrt(dx * dx + dy * dy + dz * dz)
             return distance <= shape.radius
         else:
             min_v = shape.min_vert()
             max_v = shape.max_vert()
-
             return (min_v.x <= point.x <= max_v.x and
                     min_v.y <= point.y <= max_v.y and
                     min_v.z <= point.z <= max_v.z)
-        
-    def rotate(self,angle_z:float):
+
+    def rotate(self, angle_z: float):
         angle_rad_z = math.radians(angle_z)
-        if angle_rad_z>0:
-            for vertex in self.vertices():
-                rotated_vertex = vertex.v_rotate_z(self.center, angle_rad_z)
-                vertex.x, vertex.y, vertex.z = rotated_vertex.x, rotated_vertex.y, rotated_vertex.z
+        if angle_rad_z > 0:
+            cos_z = math.cos(angle_rad_z)
+            sin_z = math.sin(angle_rad_z)
+            cx, cy = self.center.x, self.center.y
+            for vertex in self.vertices_list:
+                # Ottimizza la rotazione solo sul piano XY
+                x_shift = vertex.x - cx
+                y_shift = vertex.y - cy
+                x_new = cx + x_shift * cos_z - y_shift * sin_z
+                y_new = cy + x_shift * sin_z + y_shift * cos_z
+                vertex.x, vertex.y = x_new, y_new
 
     def min_vert(self):
-        out_x,out_y,out_z = 99999,99999,99999
-        for v in self.vertices_list:
-            if v.x < out_x: out_x = v.x
-            if v.y < out_y: out_y = v.y
-            if v.z < out_z: out_z = v.z
-        return Vector3D(out_x,out_y,out_z)
+        # Usa min/max con generator expression per efficienza
+        if not self.vertices_list:
+            return Vector3D()
+        return Vector3D(
+            min(v.x for v in self.vertices_list),
+            min(v.y for v in self.vertices_list),
+            min(v.z for v in self.vertices_list)
+        )
 
     def max_vert(self):
-        out_x,out_y,out_z = -1,-1,-1
-        for v in self.vertices_list:
-            if v.x > out_x: out_x = v.x
-            if v.y > out_y: out_y = v.y
-            if v.z > out_z: out_z = v.z
-        return Vector3D(out_x,out_y,out_z)
-        
+        if not self.vertices_list:
+            return Vector3D()
+        return Vector3D(
+            max(v.x for v in self.vertices_list),
+            max(v.y for v in self.vertices_list),
+            max(v.z for v in self.vertices_list)
+        )
+
 class Sphere(Shape):
-    def __init__(self,_object:str,shape_type:str, config_elem:dict, center: Vector3D = Vector3D()):
+    def __init__(self, _object: str, shape_type: str, config_elem: dict, center: Vector3D = Vector3D()):
         super().__init__(config_elem=config_elem, center=center)
         self._object = _object
         self._id = shape_type
         self.radius = config_elem.get("diameter", 1.0) * 0.5
+        self.set_vertices()
 
     def volume(self):
-        return (4/3) * math.pi * self.radius ** 3
+        return (4 / 3) * _PI * self.radius ** 3
 
     def get_radius(self) -> float:
         return self.radius
 
     def surface_area(self):
-        return 4 * math.pi * self.radius ** 2
+        return 4 * _PI * self.radius ** 2
 
     def set_vertices(self):
         self.vertices_list = []
-        num_vertices = 64
+        num_vertices = 32  # Ridotto per efficienza, aumenta se serve più precisione
+        cx, cy, cz = self.center.x, self.center.y, self.center.z
+        r = self.radius
         for i in range(num_vertices):
-            theta = 2 * math.pi * (i / num_vertices)
+            theta = 2 * _PI * (i / num_vertices)
+            cos_theta = math.cos(theta)
+            sin_theta = math.sin(theta)
             for j in range(num_vertices):
-                phi = math.pi * j / num_vertices
-                x = self.center.x + self.radius * math.sin(phi) * math.cos(theta)
-                y = self.center.y + self.radius * math.sin(phi) * math.sin(theta)
-                z = self.center.z + self.radius * math.cos(phi)
+                phi = _PI * j / num_vertices
+                sin_phi = math.sin(phi)
+                x = cx + r * sin_phi * cos_theta
+                y = cy + r * sin_phi * sin_theta
+                z = cz + r * math.cos(phi)
                 self.vertices_list.append(Vector3D(x, y, z))
 
 class Cuboid(Shape):
-    def __init__(self,_object:str,shape_type:str, config_elem:dict, center: Vector3D = Vector3D()):
+    def __init__(self, _object: str, shape_type: str, config_elem: dict, center: Vector3D = Vector3D()):
         super().__init__(config_elem=config_elem, center=center)
         self._object = _object
         self._id = shape_type
@@ -176,12 +203,16 @@ class Cuboid(Shape):
         self.set_vertices()
 
     def volume(self):
-        if self._id in Shape.flat_shapes: return self.width * self.depth
-        else: return self.width * self.height * self.depth
+        if self._id in Shape.flat_shapes:
+            return self.width * self.depth
+        else:
+            return self.width * self.height * self.depth
 
     def surface_area(self):
-        if self._id in Shape.flat_shapes: return self.width * self.depth
-        else: return 2 * (self.width * self.height + self.height * self.depth + self.depth * self.width)
+        if self._id in Shape.flat_shapes:
+            return self.width * self.depth
+        else:
+            return 2 * (self.width * self.height + self.height * self.depth + self.depth * self.width)
 
     def set_vertices(self):
         half_width = self.width * 0.5
@@ -221,7 +252,7 @@ class Cuboid(Shape):
                 ]
 
 class Cylinder(Shape):
-    def __init__(self,_object:str,shape_type:str, config_elem:dict, center: Vector3D = Vector3D()):
+    def __init__(self, _object: str, shape_type: str, config_elem: dict, center: Vector3D = Vector3D()):
         super().__init__(config_elem=config_elem, center=center)
         self._object = _object
         self._id = shape_type
@@ -230,40 +261,50 @@ class Cylinder(Shape):
         self.set_vertices()
 
     def volume(self):
-        return math.pi * self.radius ** 2 * self.height
+        return _PI * self.radius ** 2 * self.height
 
     def get_radius(self) -> float:
         return self.radius
-    
+
     def surface_area(self):
-        return 2 * math.pi * self.radius * (self.radius + self.height)
+        return 2 * _PI * self.radius * (self.radius + self.height)
 
     def set_vertices(self):
         self.vertices_list = []
-        num_vertices = 20
-        angle_increment = 2 * math.pi / num_vertices
         if self._object == "arena":
+            num_vertices = 20
+            angle_increment = 2 * _PI / num_vertices
+            cx, cy = self.center.x, self.center.y
             for i in range(num_vertices):
                 angle = i * angle_increment
-                x = self.center.x + self.radius * math.cos(angle)
-                y = self.center.y + self.radius * math.sin(angle)
+                cos_a = math.cos(angle)
+                sin_a = math.sin(angle)
+                x = cx + self.radius * cos_a
+                y = cy + self.radius * sin_a
                 z1 = 0
                 z2 = self.height
                 self.vertices_list.append(Vector3D(x, y, z1))
                 self.vertices_list.append(Vector3D(x, y, z2))
         else:
             num_vertices = 8 if self._object == "mark" else 16
-            angle_increment = 2 * math.pi / num_vertices
-            for i in range(num_vertices):
-                angle = i * angle_increment
-                x = self.center.x + self.radius * math.cos(angle)
-                y = self.center.y + self.radius * math.sin(angle)
-                z = 0
-                if self._id in Shape.flat_shapes:
-                    self.center.z = z
-                    self.vertices_list.append(Vector3D(x, y, z))
-                else:
-                    z1 = self.center.z - self.height * 0.5
-                    z2 = self.center.z + self.height * 0.5
-                    self.vertices_list.append(Vector3D(x, y, z1))
-                    self.vertices_list.append(Vector3D(x, y, z2))
+            angle_increment = 2 * _PI / num_vertices
+            cx, cy, cz = self.center.x, self.center.y, self.center.z
+            if self._id in Shape.flat_shapes:
+                self.center.z = 0
+                for i in range(num_vertices):
+                    angle = i * angle_increment
+                    cos_a = math.cos(angle)
+                    sin_a = math.sin(angle)
+                    x = cx + self.radius * cos_a
+                    y = cy + self.radius * sin_a
+                    self.vertices_list.append(Vector3D(x, y, 0))
+            else:
+                half_height = self.height * 0.5
+                for i in range(num_vertices):
+                    angle = i * angle_increment
+                    cos_a = math.cos(angle)
+                    sin_a = math.sin(angle)
+                    x = cx + self.radius * cos_a
+                    y = cy + self.radius * sin_a
+                    self.vertices_list.append(Vector3D(x, y, cz - half_height))
+                    self.vertices_list.append(Vector3D(x, y, cz + half_height))

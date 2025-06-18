@@ -41,9 +41,13 @@ class Config:
             pos = entity['position']
             if not (isinstance(pos, list) and all(isinstance(p, list) and len(p) in (2, 3) and all(isinstance(x, (int, float)) for x in p) for p in pos)):
                 raise ValueError(f"Optional field 'position' must be a list of [x, y] o [x, y, z] arrays in {entity.get('_id', 'entity')}")
+        if 'orientation' in entity:
+            ori = entity['orientation']
+            if not (isinstance(ori, list) and all(isinstance(o, list) and len(o) in (1, 3) and all(isinstance(x, (int, float)) for x in o) for o in ori)):
+                raise ValueError(f"Optional field 'orientation' must be a list of [z] o [x, y, z] arrays in {entity.get('_id', 'entity')}")
 
         # Trova tutti i campi-lista (sia obbligatori che opzionali), ESCLUDENDO 'position'
-        list_fields = [f for f in required_fields + optional_fields if f in entity and isinstance(entity[f], list) and f != 'position']
+        list_fields = [f for f in required_fields + optional_fields if f in entity and isinstance(entity[f], list) and f != 'position' and f != 'orientation']
         # Se nessun campo-lista (escluso position), restituisci l'entità così com'è
         if not list_fields:
             return [entity]
@@ -108,7 +112,7 @@ class Config:
         agent_required_fields = ['ticks_per_second', 'number']
         agent_optional_fields = [
             'perception_width', 'num_groups', 'num_spins_per_group', 'perception_global_inhibition',
-            'T', 'J', 'nu', 'p_spin_up', 'time_delay', 'dynamics','position'
+            'T', 'J', 'nu', 'p_spin_up', 'time_delay', 'dynamics','position','orientation'
         ]
         try:
             for k, v in environment['agents'].items():
@@ -134,10 +138,13 @@ class Config:
                 for object_combo in object_combos:
                     experiment = {
                         "environment": {
+                            "collisions": environment.get("collisions", False),
                             "parallel_experiments": environment.get("parallel_experiments", False),
+                            "ticks_per_second": environment.get("ticks_per_second", 10),
                             "time_limit": environment.get("time_limit", 500),
                             "num_runs": environment.get("num_runs", 1),
                             "render": environment.get("render", False),
+                            "auto_close_gui": environment.get("auto_close_gui", False),
                             "results": environment.get("results",{}),
                             "gui": environment.get("gui"),
                             "arena": arena_value,

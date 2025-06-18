@@ -103,18 +103,18 @@ class GUI_2D(QWidget):
     
     def get_agent_at(self, scene_pos):
         if self.agents_shapes is not None:
-            for key , entities in self.agents_shapes.items():
-                idx = 0
-                for entity in entities:
+            for key, entities in self.agents_shapes.items():
+                for idx, entity in enumerate(entities):
+                    vertices = entity.vertices()
                     polygon = QPolygonF([
                         QPointF(
                             vertex.x * self.scale + self.offset_x,
                             vertex.y * self.scale + self.offset_y
                         )
-                        for vertex in entity.vertices()
+                        for vertex in vertices
                     ])
-                    if polygon.containsPoint(scene_pos, Qt.FillRule.OddEvenFill): return key,idx
-                    idx += 1
+                    if polygon.containsPoint(scene_pos, Qt.FillRule.OddEvenFill):
+                        return key, idx
         return None
     
     def resizeEvent(self, event):
@@ -211,11 +211,9 @@ class GUI_2D(QWidget):
         arena_height = max_y - min_y
         margin_x = 40
         margin_y = 40
-        # keep the arena in the view
-        scale_x = (view_width - 2*margin_x) / arena_width if arena_width > 0 else 1
-        scale_y = (view_height - 2*margin_y) / arena_height if arena_height > 0 else 1
+        scale_x = (view_width - 2 * margin_x) / arena_width if arena_width > 0 else 1
+        scale_y = (view_height - 2 * margin_y) / arena_height if arena_height > 0 else 1
         self.scale = min(scale_x, scale_y)
-        # Offset: top-left corner in (margin_x, margin_y)
         self.offset_x = margin_x - min_x * self.scale
         self.offset_y = margin_y - min_y * self.scale
         transformed_vertices = [
@@ -232,43 +230,49 @@ class GUI_2D(QWidget):
         self.data_label.setText(f"Time: {self.time}")
         self.scene.clear()
         self.draw_arena()
+        scale = self.scale
+        offset_x = self.offset_x
+        offset_y = self.offset_y
+
+        # Oggetti statici
         if self.objects_shapes is not None:
-            for _, entities in self.objects_shapes.items():
+            for entities in self.objects_shapes.values():
                 for entity in entities:
+                    vertices = entity.vertices()
                     entity_vertices = [
                         QPointF(
-                            vertex.x * self.scale + self.offset_x,
-                            vertex.y * self.scale + self.offset_y
+                            vertex.x * scale + offset_x,
+                            vertex.y * scale + offset_y
                         )
-                        for vertex in entity.vertices()
+                        for vertex in vertices
                     ]
-                    entity_polygon = QPolygonF(entity_vertices)
                     entity_color = QColor(entity.color())
+                    entity_polygon = QPolygonF(entity_vertices)
                     self.scene.addPolygon(entity_polygon, QPen(entity_color, .1), QBrush(entity_color))
+
+        # Agenti
         if self.agents_shapes is not None:
             for key, entities in self.agents_shapes.items():
-                idx = 0
-                for entity in entities:
+                for idx, entity in enumerate(entities):
+                    vertices = entity.vertices()
                     entity_vertices = [
                         QPointF(
-                            vertex.x * self.scale + self.offset_x,
-                            vertex.y * self.scale + self.offset_y
+                            vertex.x * scale + offset_x,
+                            vertex.y * scale + offset_y
                         )
-                        for vertex in entity.vertices()
+                        for vertex in vertices
                     ]
-                    entity_polygon = QPolygonF(entity_vertices)
                     entity_color = QColor(entity.color())
+                    entity_polygon = QPolygonF(entity_vertices)
                     self.scene.addPolygon(entity_polygon, QPen(entity_color, .1), QBrush(entity_color))
-                    if self.clicked_spin is not None and self.clicked_spin[0]==key and self.clicked_spin[1]==idx:
-                        # Draw a circle that envelopes the entity_vertices
+                    # Evidenzia agente selezionato
+                    if self.clicked_spin is not None and self.clicked_spin[0] == key and self.clicked_spin[1] == idx:
                         xs = [point.x() for point in entity_vertices]
                         ys = [point.y() for point in entity_vertices]
                         centroid_x = sum(xs) / len(xs)
                         centroid_y = sum(ys) / len(ys)
-                        # Compute max distance from centroid to any vertex
                         max_radius = max(math.hypot(x - centroid_x, y - centroid_y) for x, y in zip(xs, ys))
-                        # Draw the circle
-                        circle = self.scene.addEllipse(
+                        self.scene.addEllipse(
                             centroid_x - max_radius,
                             centroid_y - max_radius,
                             2 * max_radius,
@@ -276,17 +280,17 @@ class GUI_2D(QWidget):
                             QPen(QColor("white"), 1),
                             QBrush(Qt.NoBrush)
                         )
-                    entity_attachments = entity.get_attachments()
-                    for attachment in entity_attachments:
+                    # Attachments
+                    attachments = entity.get_attachments()
+                    for attachment in attachments:
+                        att_vertices = attachment.vertices()
                         attachment_vertices = [
                             QPointF(
-                                vertex.x * self.scale + self.offset_x,
-                                vertex.y * self.scale + self.offset_y
+                                vertex.x * scale + offset_x,
+                                vertex.y * scale + offset_y
                             )
-                            for vertex in attachment.vertices()
+                            for vertex in att_vertices
                         ]
-                        attachment_polygon = QPolygonF(attachment_vertices)
                         attachment_color = QColor(attachment.color())
+                        attachment_polygon = QPolygonF(attachment_vertices)
                         self.scene.addPolygon(attachment_polygon, QPen(attachment_color, 1), QBrush(attachment_color))
-                    idx += 1
-

@@ -1,4 +1,4 @@
-import logging,multiprocessing,psutil,gc
+import logging, multiprocessing, psutil, gc
 from config import Config
 from entity import EntityFactory
 from arena import ArenaFactory
@@ -7,7 +7,6 @@ from entity_manager import EntityManager
 from collision_detector import CollisionDetector
 
 class EnvironmentFactory():
-
     @staticmethod
     def create_environment(config_elem:Config):
         if not config_elem.environment.get("parallel_experiments",False) or config_elem.environment["render"]:
@@ -16,9 +15,8 @@ class EnvironmentFactory():
             return MultiProcessEnvironment(config_elem)
         else:
             raise ValueError(f"Invalid environment configuration: {config_elem.environment['parallel_experiments']} {config_elem.environment['render']}")
-        
+
 class Environment():
-    
     def __init__(self,config_elem:Config):
         self.experiments = config_elem.parse_experiments()
         self.num_runs = int(config_elem.environment.get("num_runs",1))
@@ -34,7 +32,6 @@ class Environment():
         pass
 
 class SingleProcessEnvironment(Environment):
-    
     def __init__(self,config_elem:Config):
         super().__init__(config_elem)
         logging.info("Single process environment created successfully")
@@ -45,7 +42,7 @@ class SingleProcessEnvironment(Environment):
             arena.reset_seed()
         arena.initialize()
         return arena
-    
+
     def agents_init(self,exp):
         agents = {agent_type: (exp.environment.get("agents").get(agent_type),[]) for agent_type in exp.environment.get("agents").keys()}
         for key,(config,entities) in agents.items():
@@ -54,9 +51,8 @@ class SingleProcessEnvironment(Environment):
         logging.info(f"Agents initialized: {list(agents.keys())}")
         return agents
 
-    def run_gui(self, config, arena_vertices, arena_color,gui_in_queue,gui_control_queue):
-        """Function to run the GUI in a separate process"""
-        app,gui = GuiFactory.create_gui(config,arena_vertices,arena_color,gui_in_queue,gui_control_queue)
+    def run_gui(self, config, arena_vertices, arena_color, gui_in_queue, gui_control_queue):
+        app, gui = GuiFactory.create_gui(config, arena_vertices, arena_color, gui_in_queue, gui_control_queue)
         gui.show()
         app.exec()
 
@@ -73,114 +69,105 @@ class SingleProcessEnvironment(Environment):
             gui_control_queue = multiprocessing.Queue()
             arena = self.arena_init(exp)
             agents = self.agents_init(exp)
-            collision_detector = CollisionDetector(arena.get_shape(),self.collisions)
-            entity_manager = EntityManager(agents,arena.get_shape())
-            arena_process = multiprocessing.Process(target=arena.run, args=(self.num_runs,self.time_limit,arena_queue,agents_queue,gui_in_queue,gui_out_arena_queue,dec_arena_in,gui_control_queue,self.render[0]))
-            agents_process = multiprocessing.Process(target=entity_manager.run, args=(self.num_runs,self.time_limit,arena_queue,agents_queue,gui_out_agents_queue,dec_agents_in,dec_agents_out,self.render[0]))
-            detector_process = multiprocessing.Process(target=collision_detector.run, args=(dec_agents_in,dec_agents_out,dec_arena_in))
-            
-            # Initialize GUI only if rendering is enabled
-            killed = 0  
-            if self.render[0]:
-                self.render[1]["_id"] = "abstract" if arena.get_id() in (None, "none") else self.gui_id
-                gui_process = multiprocessing.Process(target=self.run_gui, args=(self.render[1],arena.get_shape().vertices(),arena.get_shape().color(),gui_in_queue,gui_control_queue)) # type: ignore
-                gui_process.start()
-                if arena.get_id() not in ("abstract", "none", None): detector_process.start()
-                agents_process.start()
-                arena_process.start()
-                while gui_process.is_alive():
-                    if arena_process.exitcode not in (None, 0):
-                        killed = 1
-                        agents_process.terminate()
-                        gui_process.terminate()
-                        if detector_process.pid is not None:
-                            if detector_process.is_alive(): detector_process.terminate()
-                            detector_process.join()
-                        arena_process.join()
-                        agents_process.join()
-                        gui_process.join()
-                        raise RuntimeError(f"Arena process exited with code {arena_process.exitcode}")
-                    elif agents_process.exitcode not in (None, 0):
-                        killed = 1
-                        arena_process.terminate()
-                        gui_process.terminate()
-                        if detector_process.pid is not None:
-                            if detector_process.is_alive(): detector_process.terminate()
-                            detector_process.join()
-                        arena_process.join()
-                        agents_process.join()
-                        gui_process.join()
-                        raise RuntimeError(f"Agents process exited with code {agents_process.exitcode}")
-                    elif self.render[0] and gui_process.exitcode not in (None, 0):
-                        killed = 1
-                        arena_process.terminate()
-                        agents_process.terminate()
-                        if detector_process.pid is not None:
-                            if detector_process.is_alive(): detector_process.terminate()
-                            detector_process.join()
-                        arena_process.join()
-                        agents_process.join()
-                        gui_process.join()
-                        raise RuntimeError(f"GUI process exited with code {gui_process.exitcode}")
-                    if killed == 0 and (psutil.Process(gui_process.pid).status() == psutil.STATUS_ZOMBIE or psutil.Process(gui_process.pid).status() == psutil.STATUS_DEAD):
-                        gui_out_arena_queue.put({"status": "end"})
-                        gui_out_agents_queue.put({"status": "end"})
-                        killed = 1
-                        if arena_process.is_alive(): arena_process.terminate()
-                        arena_process.join()
-                        if agents_process.is_alive(): agents_process.terminate()
-                        agents_process.join()
-                        if detector_process.pid is not None:
-                            if detector_process.is_alive(): detector_process.terminate()
-                            detector_process.join()
-                        gui_process.terminate()
-                        gui_process.join()
-                    if self.auto_close_gui and not arena_process.is_alive():
-                        arena_process.join()
-                        agents_process.join()
-                        if detector_process.pid is not None:
-                            if detector_process.is_alive(): detector_process.terminate()
-                            detector_process.join()
-                        gui_process.terminate()
-                        gui_process.join()
-                if killed == 1: break
-            else:
-                if arena.get_id() not in ("abstract", "none", None): detector_process.start()
-                agents_process.start()
-                arena_process.start()
+            arena_shape = arena.get_shape()
+            arena_id = arena.get_id()
+            render_enabled = self.render[0]
+            collision_detector = CollisionDetector(arena_shape, self.collisions)
+            entity_manager = EntityManager(agents, arena_shape)
+            arena_process = multiprocessing.Process(target=arena.run, args=(self.num_runs, self.time_limit, arena_queue, agents_queue, gui_in_queue, gui_out_arena_queue, dec_arena_in, gui_control_queue, render_enabled))
+            agents_process = multiprocessing.Process(target=entity_manager.run, args=(self.num_runs, self.time_limit, arena_queue, agents_queue, gui_out_agents_queue, dec_agents_in, dec_agents_out, render_enabled))
+            detector_process = multiprocessing.Process(target=collision_detector.run, args=(dec_agents_in, dec_agents_out, dec_arena_in))
 
-                while arena_process.exitcode==None and agents_process.exitcode==None:
-                    pass
-                
+            killed = 0
+            if render_enabled:
+                self.render[1]["_id"] = "abstract" if arena_id in (None, "none") else self.gui_id
+                gui_process = multiprocessing.Process(target=self.run_gui, args=(self.render[1], arena_shape.vertices(), arena_shape.color(), gui_in_queue, gui_control_queue)) # type: ignore
+                gui_process.start()
+                if arena_id not in ("abstract", "none", None):
+                    detector_process.start()
+                agents_process.start()
+                arena_process.start()
+                while True:
+                    arena_alive = arena_process.is_alive()
+                    agents_alive = agents_process.is_alive()
+                    gui_alive = gui_process.is_alive()
+                    detector_alive = detector_process.is_alive() if detector_process.pid is not None else False
+                    arena_exit = arena_process.exitcode
+                    agents_exit = agents_process.exitcode
+                    gui_exit = gui_process.exitcode
+                    # Check for process failures
+                    if arena_exit not in (None, 0):
+                        killed = 1
+                        if agents_alive: agents_process.terminate()
+                        if gui_alive: gui_process.terminate()
+                        if detector_alive: detector_process.terminate()
+                        break
+                    elif agents_exit not in (None, 0):
+                        killed = 1
+                        if arena_alive: arena_process.terminate()
+                        if gui_alive: gui_process.terminate()
+                        if detector_alive: detector_process.terminate()
+                        break
+                    elif render_enabled and gui_exit not in (None, 0):
+                        killed = 1
+                        if arena_alive: arena_process.terminate()
+                        if agents_alive: agents_process.terminate()
+                        if detector_alive: detector_process.terminate()
+                        break
+                    # Zombie/Dead GUI process
+                    if killed == 0 and gui_process.pid is not None:
+                        gui_status = psutil.Process(gui_process.pid).status()
+                        if gui_status in (psutil.STATUS_ZOMBIE, psutil.STATUS_DEAD):
+                            gui_out_arena_queue.put({"status": "end"})
+                            gui_out_agents_queue.put({"status": "end"})
+                            killed = 1
+                            if arena_alive: arena_process.terminate()
+                            if agents_alive: agents_process.terminate()
+                            if detector_alive: detector_process.terminate()
+                            break
+                    if self.auto_close_gui and not arena_alive:
+                        if agents_alive: agents_process.terminate()
+                        if detector_alive: detector_process.terminate()
+                        if gui_alive: gui_process.terminate()
+                        break
+                    if not gui_alive:
+                        break
+                # Join all processes
+                if arena_process.is_alive(): arena_process.join()
+                if agents_process.is_alive(): agents_process.join()
+                if detector_process.is_alive(): detector_process.join()
+                if gui_process.is_alive(): gui_process.join()
+                if killed == 1:
+                    raise RuntimeError("A subprocess exited unexpectedly.")
+            else:
+                if arena_id not in ("abstract", "none", None):
+                    detector_process.start()
+                agents_process.start()
+                arena_process.start()
+                # Usa join con timeout per evitare busy waiting
+                while arena_process.is_alive() and agents_process.is_alive():
+                    arena_process.join(timeout=0.1)
+                    agents_process.join(timeout=0.1)
+                killed = 0
                 if arena_process.exitcode not in (None, 0):
                     killed = 1
-                    agents_process.terminate()
-                    if detector_process.pid is not None:
-                        if detector_process.is_alive(): detector_process.terminate()
-                        detector_process.join()
-                    arena_process.join()
-                    agents_process.join()
-                    raise RuntimeError(f"Arena process exited with code {arena_process.exitcode}")
+                    if agents_process.is_alive(): agents_process.terminate()
+                    if detector_process.is_alive(): detector_process.terminate()
                 elif agents_process.exitcode not in (None, 0):
                     killed = 1
-                    arena_process.terminate()
-                    if detector_process.pid is not None:
-                        if detector_process.is_alive(): detector_process.terminate()
-                        detector_process.join()
-                    arena_process.join()
-                    agents_process.join()
-                    raise RuntimeError(f"Agents process exited with code {agents_process.exitcode}")
-                if killed == 0:
-                    arena_process.join()
-                    if agents_process.is_alive(): agents_process.terminate()
-                    agents_process.join()
+                    if arena_process.is_alive(): arena_process.terminate()
                     if detector_process.is_alive(): detector_process.terminate()
-                    detector_process.join()
+                # Join all processes
+                if arena_process.is_alive(): arena_process.join()
+                if agents_process.is_alive(): agents_process.join()
+                if detector_process.is_alive(): detector_process.join()
+                if killed == 1:
+                    raise RuntimeError("A subprocess exited unexpectedly.")
+            # Garbage collection solo una volta per esperimento
             gc.collect()
         logging.info("All experiments completed successfully")
 
 class MultiProcessEnvironment(Environment):
-    
     def __init__(self,config_elem:Config):
         super().__init__(config_elem)
         logging.info("Multi process environment created successfully")

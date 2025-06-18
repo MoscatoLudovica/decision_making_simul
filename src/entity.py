@@ -4,6 +4,8 @@ from random import Random
 from geometry_utils.vector3D import Vector3D
 from bodies.shapes3D import Shape3DFactory
 from spinsystem import SpinSystem
+
+_PI = math.pi
 class EntityFactory:
     
     @staticmethod
@@ -257,12 +259,13 @@ class MovableAgent(StaticAgent):
         self.moving_behavior = config_elem.get("moving_behavior","random_walk")
         self.pre_run = config_elem.get("spin_pre_run",False)
         if self.detection in ("visual"):
-            self.spin_pre_run_steps = config_elem.get("spin_pre_run_steps",1000)
+            self.spin_per_tick = config_elem.get("spin_per_tick",1)
+            self.spin_pre_run_steps = config_elem.get("spin_pre_run_steps",100)
             self.perception_width = config_elem.get("perception_width",0.1)
             self.num_groups = config_elem.get("num_groups",32)
             self.num_spins_per_group = config_elem.get("num_spins_per_group",10)
             self.perception_global_inhibition = config_elem.get("perception_global_inhibition",0)
-            self.group_angles = np.linspace(0, 2*math.pi, self.num_groups, endpoint=False)
+            self.group_angles = np.linspace(0, 2 * _PI, self.num_groups, endpoint=False)
         else:
             self.max_turning_ticks = 160
             self.standard_motion_steps = 5*16
@@ -322,20 +325,21 @@ class MovableAgent(StaticAgent):
                 p = Random.uniform(self.random_generator,0,1)
                 if p < 0.5: self.motion = MovableAgent.LEFT
                 else: self.motion = MovableAgent.RIGHT
-                angle = Random.uniform(self.random_generator,0,math.pi) if self.crw_exponent == 0 else abs(wrapped_cauchy_pp(self.random_generator,self.crw_exponent))
+                angle = Random.uniform(self.random_generator,0,_PI) if self.crw_exponent == 0 else abs(wrapped_cauchy_pp(self.random_generator,self.crw_exponent))
                 self.turning_ticks = int(angle * self.max_turning_ticks)
 
-    def random_way_point(self,arena_shape):
-        if self.goal_position == None or math.sqrt((self.position.x - self.goal_position.x)**2 + (self.position.y - self.goal_position.y)**2) <= .001:
+    def random_way_point(self, arena_shape):
+        if self.goal_position is None or (self.position - self.goal_position).magnitude() <= .001:
             self.goal_position = self.shape._get_random_point_inside_shape(self.random_generator, arena_shape)
         dx = self.goal_position.x - self.position.x
         dy = self.goal_position.y - self.position.y
         angle_to_goal = math.degrees(math.atan2(-dy, dx))
         angle_to_goal = normalize_angle(angle_to_goal - self.orientation.z)
         distance = self.position - self.goal_position
-        if abs(distance.magnitude()) >= self.prev_goal_distance:
+        dist_mag = distance.magnitude()
+        if abs(dist_mag) >= self.prev_goal_distance:
             self.last_motion_tick += 1
-        self.prev_goal_distance = distance.magnitude()
+        self.prev_goal_distance = dist_mag
         if self.last_motion_tick > self.ticks_per_second:
             self.last_motion_tick = 0
             self.goal_position = None
@@ -360,21 +364,20 @@ class MovableAgent(StaticAgent):
             self.spin_system.set_p_spin_up(np.mean(self.spin_system.get_states()))
             self.spin_system.reset_spins()
 
-    def update_visual_detection(self,objects):
+    def update_visual_detection(self, objects):
         perception = np.zeros(self.num_groups * self.num_spins_per_group)
-        for _,(shapes,positions,strengths,uncertainties) in objects.items():
+        sigma0 = self.perception_width
+        for _, (shapes, positions, strengths, uncertainties) in objects.items():
             for n in range(len(shapes)):
                 dx = positions[n].x - self.position.x
                 dy = positions[n].y - self.position.y
                 angle_to_object = math.degrees(math.atan2(-dy, dx))
                 angle_to_object = normalize_angle(angle_to_object - self.orientation.z)
-                effective_width = self.perception_width + uncertainties[n]
+                effective_width = sigma0 + uncertainties[n]
                 angle_diffs = np.abs(self.group_angles - math.radians(angle_to_object))
-                angle_diffs = np.minimum(angle_diffs, 2*math.pi - angle_diffs)
-                sigma0 = self.perception_width
-                sigma = effective_width
-                if sigma <= 0: sigma = 1e-6
-                weights = (sigma0 / sigma) * np.exp(-(angle_diffs ** 2) / (2 * (sigma**2)))
+                angle_diffs = np.minimum(angle_diffs, 2 * _PI - angle_diffs)
+                sigma = max(effective_width, 1e-6)
+                weights = (sigma0 / sigma) * np.exp(-(angle_diffs ** 2) / (2 * (sigma ** 2)))
                 weights *= strengths[n]
                 perception += np.repeat(weights, self.num_spins_per_group)
         perception -= self.perception_global_inhibition
@@ -390,34 +393,32 @@ class MovableAgent(StaticAgent):
         self.shape.translate(self.position)
         self.shape.translate_attachments(self.orientation.z)
 
-    def spins_routine(self,objects):
+    def spins_routine(self, objects):
         self.prev_position = self.position
         self.prev_orientation = self.orientation
         self.update_visual_detection(objects)
         self.spin_system.update_external_field(self.perception)
-        self.spin_system.run_spins()
+        self.spin_system.run_spins(steps=self.spin_per_tick)
         angle_rad = self.spin_system.average_direction_of_activity()
         if angle_rad is not None:
             angle_deg = normalize_angle(math.degrees(angle_rad))
-            if angle_deg > self.max_angular_velocity:
-                angle_deg = self.max_angular_velocity
-            elif angle_deg < -self.max_angular_velocity:
-                angle_deg = -self.max_angular_velocity
-            self.delta_orientation = Vector3D(0,0,angle_deg)
+            angle_deg = max(min(angle_deg, self.max_angular_velocity), -self.max_angular_velocity)
+            self.delta_orientation = Vector3D(0, 0, angle_deg)
             self.orientation = self.orientation + self.delta_orientation
             self.orientation.z = normalize_angle(self.orientation.z)
             angle_rad = math.radians(self.orientation.z)
             width = self.spin_system.get_width_of_activity()
-            if width is not None and width > 0:
-                scaling_factor = 1.0 / width
-            else:
-                scaling_factor = 0.0 
+            scaling_factor = 1.0 / width if width and width > 0 else 0.0
             scaling_factor = np.clip(scaling_factor, 0.0, 1.0)
-            self.forward_vector = Vector3D(self.max_absolute_velocity*scaling_factor * math.cos(angle_rad),
-                                            self.max_absolute_velocity*scaling_factor * -math.sin(angle_rad),
-                                            0)
+            cos_angle = math.cos(angle_rad)
+            sin_angle = math.sin(angle_rad)
+            self.forward_vector = Vector3D(
+                self.max_absolute_velocity * scaling_factor * cos_angle,
+                self.max_absolute_velocity * scaling_factor * -sin_angle,
+                0
+            )
 
-    def GPS_routine(self,tick,arena_shape):
+    def GPS_routine(self, tick, arena_shape):
         if self.moving_behavior == "random_walk":
             self.random_walk(tick)
         elif self.moving_behavior == "random_way_point":
@@ -426,46 +427,46 @@ class MovableAgent(StaticAgent):
             raise ValueError(f"Invalid moving behavior: {self.moving_behavior}")
         self.prev_position = self.position
         self.prev_orientation = self.orientation
-        self.delta_orientation = Vector3D(0,0,0)
+        self.delta_orientation = Vector3D(0, 0, 0)
         if self.motion == MovableAgent.LEFT:
-            self.delta_orientation = Vector3D(0,0,self.max_angular_velocity)
+            self.delta_orientation.z = self.max_angular_velocity
         elif self.motion == MovableAgent.RIGHT:
-            self.delta_orientation = Vector3D(0,0,-self.max_angular_velocity)
+            self.delta_orientation.z = -self.max_angular_velocity
         self.orientation = self.orientation + self.delta_orientation
         self.orientation.z = normalize_angle(self.orientation.z)
         angle_rad = math.radians(self.orientation.z)
-        self.forward_vector = Vector3D(self.max_absolute_velocity * math.cos(angle_rad),
-                                        self.max_absolute_velocity * -math.sin(angle_rad),
-                                        0)
+        cos_angle = math.cos(angle_rad)
+        sin_angle = math.sin(angle_rad)
+        self.forward_vector = Vector3D(
+            self.max_absolute_velocity * cos_angle,
+            self.max_absolute_velocity * -sin_angle,
+            0
+        )
 
-def wrapped_cauchy_pp(random_generator,c:float) -> float:
+
+def normalize_angle(angle: float):
+    """Normalizza l'angolo tra -180 e 180 gradi."""
+    return ((angle + 180) % 360) - 180
+
+def exponential_distribution(random_generator, alpha):
+    u = Random.uniform(random_generator, 0, 1)
+    return -alpha * math.log1p(-u)  # log1p migliora la precisione per valori piccoli
+
+def wrapped_cauchy_pp(random_generator, c: float) -> float:
     q = 0.5
-    u = Random.uniform(random_generator,0,1)
+    u = Random.uniform(random_generator, 0, 1)
     val = (1 - c) / (1 + c)
-    return 2 * math.atan(val * math.tanh(math.pi * (u - q)))
+    return 2 * math.atan(val * math.tanh(_PI * (u - q)))
 
-def levy(random_generator,c:float,alpha:float) -> int:
-    u = math.pi * (Random.uniform(random_generator,0,1) - 0.5)
+def levy(random_generator, c: float, alpha: float) -> int:
+    u = _PI * (Random.uniform(random_generator, 0, 1) - 0.5)
     if alpha == 1:
-        t = math.tan(u)
-        return (int)(c * t)
+        return int(c * math.tan(u))
     v = 0
-    while v == 0: v = exponential_distribution(random_generator,1)
+    while v == 0:
+        v = exponential_distribution(random_generator, 1)
     if alpha == 2:
-        t = 2 * math.sin(u) * math.sqrt(v)
-        return (int)(c * t)
+        return int(c * 2 * math.sin(u) * math.sqrt(v))
     t = math.sin(alpha * u) / math.pow(math.cos(u), 1 / alpha)
-    s = math.pow(math.cos((1 - alpha) * u) / v,(1- alpha) / alpha)
-    return (int)(c * t * s)
-    
-def exponential_distribution(random_generator,alpha):
-    u = Random.uniform(random_generator,0,1)
-    x = (-alpha) * math.log(1 - u)
-    return x
-
-def normalize_angle(angle:float):
-    while angle > 180:
-        angle -= 360
-    while angle < -180:
-        angle += 360
-    return angle
+    s = math.pow(math.cos((1 - alpha) * u) / v, (1 - alpha) / alpha)
+    return int(c * t * s)

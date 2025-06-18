@@ -25,7 +25,8 @@ class Arena():
     
     def __init__(self, config_elem:Config):
         self.random_generator = Random()
-        self.ticks_per_second = config_elem.environment.get("ticks_per_second", 10)
+        self.ticks_per_second = int(config_elem.environment.get("ticks_per_second", 10))
+        print(self.ticks_per_second)
         self.random_seed = config_elem.arena.get("random_seed",-1)
         self._id = "none" if config_elem.arena.get("_id") == "abstract" else config_elem.arena.get("_id","none") 
         self.objects = {object_type: (config_elem.environment.get("objects",{}).get(object_type),[]) for object_type in config_elem.environment.get("objects",{}).keys()}
@@ -71,7 +72,7 @@ class Arena():
         for (config,entities) in self.objects.values():
             for n in range(len(entities)):
                 entities[n].close()
-        pass
+        if self.data_handling is not None: self.data_handling.close(self.agents_shapes)
 
 
 class AbstractArena(Arena):
@@ -97,44 +98,57 @@ class SolidArena(Arena):
     
     def initialize(self):
         super().initialize()
-        min_v  = self.shape.min_vert()
-        max_v  = self.shape.max_vert()
-        for (config,entities) in self.objects.values():
-            for n in range(len(entities)):
-                entities[n].set_position(Vector3D(999,0,0),False)
-        for (config,entities) in self.objects.values():
-            for n in range(len(entities)):
-                if not entities[n].get_orientation_from_dict():
-                    rand_angle = Random.uniform(self.random_generator,0.0,360.0)
-                    entities[n].set_start_orientation(Vector3D(0,0,rand_angle))
-                position = entities[n].get_start_position()
-                if not entities[n].get_position_from_dict():
+        min_v = self.shape.min_vert()
+        max_v = self.shape.max_vert()
+        rng = self.random_generator
+        for (config, entities) in self.objects.values():
+            n_entities = len(entities)
+            for entity in entities:
+                entity.set_position(Vector3D(999, 0, 0), False)
+            for n in range(n_entities):
+                entity = entities[n]
+                if not entity.get_orientation_from_dict():
+                    rand_angle = Random.uniform(rng, 0.0, 360.0)
+                    entity.set_start_orientation(Vector3D(0, 0, rand_angle))
+                position = entity.get_start_position()
+                if not entity.get_position_from_dict():
                     count = 0
                     done = False
+                    shape_n = entity.get_shape()
+                    shape_type_n = entity.get_shape_type()
+                    min_vert_z = abs(shape_n.min_vert().z)
                     while not done and count < 500:
                         done = True
-                        rand_pos = Vector3D(Random.uniform(self.random_generator,min_v.x,max_v.x),
-                                            Random.uniform(self.random_generator,min_v.y,max_v.y),
-                                            abs(entities[n].get_shape().min_vert().z)) 
-                        entities[n].to_origin()
-                        entities[n].set_position(rand_pos)
-                        if entities[n].get_shape().check_overlap(self.shape)[0]:
+                        rand_pos = Vector3D(
+                            Random.uniform(rng, min_v.x, max_v.x),
+                            Random.uniform(rng, min_v.y, max_v.y),
+                            min_vert_z
+                        )
+                        entity.to_origin()
+                        entity.set_position(rand_pos)
+                        shape_n = entity.get_shape()
+                        # Overlap con arena
+                        if shape_n.check_overlap(self.shape)[0]:
                             done = False
+                        # Overlap con altre entità
                         if done:
-                            for m in range(len(entities)):
-                                if entities[n].get_shape_type() == "dense" and entities[m].get_shape_type()=="dense" and m!=n and entities[n].get_shape().check_overlap(entities[m].get_shape())[0]:
-                                    done = False
-                                    break
-                                elif entities[n].get_shape_type() == "flat" and entities[m].get_shape_type()=="flat" and m!=n and entities[n].get_shape().check_overlap(entities[m].get_shape())[0]:
+                            for m in range(n_entities):
+                                if m == n:
+                                    continue
+                                other_entity = entities[m]
+                                other_shape = other_entity.get_shape()
+                                other_shape_type = other_entity.get_shape_type()
+                                if shape_type_n == other_shape_type and shape_n.check_overlap(other_shape)[0]:
                                     done = False
                                     break
                         count += 1
-                        if done: entities[n].set_start_position(rand_pos,False)
+                        if done:
+                            entity.set_start_position(rand_pos, False)
                     if not done:
-                        raise Exception(f"Impossible to place object {entities[n].entity()} in the arena")
+                        raise Exception(f"Impossible to place object {entity.entity()} in the arena")
                 else:
-                    entities[n].to_origin()
-                    entities[n].set_start_position(Vector3D(position.x,position.y,position.z + (abs(entities[n].get_shape().min_vert().z))))
+                    entity.to_origin()
+                    entity.set_start_position(Vector3D(position.x, position.y, position.z + abs(entity.get_shape().min_vert().z)))
 
     def pack_objects_data(self) -> dict:
         out = {}
@@ -234,53 +248,65 @@ class SolidArena(Arena):
                 self.increment_seed()
                 self.reset()
                 if not render: print("")
-                if self.data_handling is not None: self.data_handling.close(self.agents_shapes)
             else:
                 self.close()
                 if not render: print("")
-                if self.data_handling is not None: self.data_handling.close(self.agents_shapes)
         
     def reset(self):
         super().reset()
-        min_v  = self.shape.min_vert()
-        max_v  = self.shape.max_vert()
-        for (config,entities) in self.objects.values():
-            for n in range(len(entities)):
-                entities[n].set_position(Vector3D(999,0,0),False)
-        for (config,entities) in self.objects.values():
-            for n in range(len(entities)):
-                entities[n].set_start_orientation(entities[n].get_start_orientation())
-                if not entities[n].get_orientation_from_dict():
-                    rand_angle = Random.uniform(self.random_generator,0.0,360.0)
-                    entities[n].set_start_orientation(Vector3D(0,0,rand_angle))
-                position = entities[n].get_start_position()
-                if not entities[n].get_position_from_dict():
+        min_v = self.shape.min_vert()
+        max_v = self.shape.max_vert()
+        rng = self.random_generator
+        if self.data_handling is not None: self.data_handling.close(self.agents_shapes)
+        for (config, entities) in self.objects.values():
+            n_entities = len(entities)
+            for entity in entities:
+                entity.set_position(Vector3D(999, 0, 0), False)
+            for n in range(n_entities):
+                entity = entities[n]
+                entity.set_start_orientation(entity.get_start_orientation())
+                if not entity.get_orientation_from_dict():
+                    rand_angle = Random.uniform(rng, 0.0, 360.0)
+                    entity.set_start_orientation(Vector3D(0, 0, rand_angle))
+                position = entity.get_start_position()
+                if not entity.get_position_from_dict():
                     count = 0
                     done = False
+                    shape_n = entity.get_shape()
+                    shape_type_n = entity.get_shape_type()
+                    min_vert_z = abs(shape_n.min_vert().z)
                     while not done and count < 500:
                         done = True
-                        rand_pos = Vector3D(Random.uniform(self.random_generator,min_v.x,max_v.x),
-                                            Random.uniform(self.random_generator,min_v.y,max_v.y),
-                                            abs(entities[n].get_shape().min_vert().z)) 
-                        entities[n].to_origin()
-                        entities[n].set_position(rand_pos)
-                        if entities[n].get_shape().check_overlap(self.shape)[0]:
+                        rand_pos = Vector3D(
+                            Random.uniform(rng, min_v.x, max_v.x),
+                            Random.uniform(rng, min_v.y, max_v.y),
+                            min_vert_z
+                        )
+                        entity.to_origin()
+                        entity.set_position(rand_pos)
+                        shape_n = entity.get_shape()
+                        # Overlap con arena
+                        if shape_n.check_overlap(self.shape)[0]:
                             done = False
+                        # Overlap con altre entità
                         if done:
-                            for m in range(len(entities)):
-                                if entities[n].get_shape_type() == "dense" and entities[m].get_shape_type()=="dense" and m!=n and entities[n].get_shape().check_overlap(entities[m].get_shape())[0]:
-                                    done = False
-                                    break
-                                if entities[n].get_shape_type() == "flat" and entities[m].get_shape_type()=="flat" and m!=n and entities[n].get_shape().check_overlap(entities[m].get_shape())[0]:
+                            for m in range(n_entities):
+                                if m == n:
+                                    continue
+                                other_entity = entities[m]
+                                other_shape = other_entity.get_shape()
+                                other_shape_type = other_entity.get_shape_type()
+                                if shape_type_n == other_shape_type and shape_n.check_overlap(other_shape)[0]:
                                     done = False
                                     break
                         count += 1
-                        if done: entities[n].set_start_position(rand_pos,False)
+                        if done:
+                            entity.set_start_position(rand_pos, False)
                     if not done:
-                        raise Exception(f"Impossible to place object {entities[n].entity()} in the arena")
+                        raise Exception(f"Impossible to place object {entity.entity()} in the arena")
                 else:
-                    entities[n].to_origin()
-                    entities[n].set_start_position(Vector3D(position.x,position.y,position.z + (abs(entities[n].get_shape().min_vert().z))))
+                    entity.to_origin()
+                    entity.set_start_position(Vector3D(position.x, position.y, position.z + abs(entity.get_shape().min_vert().z)))
 
     def close(self):
         super().close()

@@ -1,8 +1,8 @@
 {
     "environment":{
         "collisions": false,
-        "ticks_per_second": 1,
-        "time_limit": 0,
+        "ticks_per_second": 10,
+        "time_limit": 100,
         "num_runs": 1,
         "render": true,
         "auto_close_gui": true,
@@ -33,32 +33,34 @@
                 "diameter": 0.05,
                 "color": "green",
                 "strength": [[5, 5]],
-                "uncertainty": [[0.5]]
+                "uncertainty": [[0]]
             }
         },
         "agents":{
             "movable_0":{
-                "ticks_per_second": 10,
+                "ticks_per_second": 30,
+                "spin_per_tick": 10,
                 "spin_pre_run": true,
-                "spin_pre_run_steps": 500,
-                "number": [5],
+                "spin_pre_run_steps": 1000,
+                "number": [1],
                 "position": [[0, 0.4, 0]],
+                "orientation": [[0,0,90]],
                 "shape": "cylinder",
-                "linear_velocity": 0.01,
-                "angular_velocity": 5,
+                "linear_velocity": 0.03,
+                "angular_velocity": 45,
                 "height": 0.02,
                 "diameter": 0.033,
                 "color": "blue",
                 "detection": "visual",
                 "moving_behavior":"spin_model",
-                "perception_width": [0.5],
+                "perception_width": [0.2],
                 "num_groups": [32],
                 "num_spins_per_group": [10],
-                "perception_global_inhibition": [1],
-                "T": [0.2],
-                "J": [16],
+                "perception_global_inhibition": [0],
+                "T": [0.3],
+                "J": [30],
                 "nu": [0.5],
-                "p_spin_up": [0.05],
+                "p_spin_up": [0.5],
                 "time_delay": [0],
                 "dynamics": ["metropolis"]
             }
