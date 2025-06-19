@@ -1,4 +1,5 @@
-import logging, multiprocessing, time
+import logging, time
+import multiprocessing as mp
 from config import Config
 from random import Random
 from bodies.shapes3D import Shape3DFactory
@@ -62,7 +63,7 @@ class Arena():
             for n in range(config["number"]):
                 entities.append(EntityFactory.create_entity(entity_type="object_"+key,config_elem=config,_id=n))
                 
-    def run(self,num_runs,time_limit, arena_queue:multiprocessing.Queue, agents_queue:multiprocessing.Queue, gui_in_queue:multiprocessing.Queue, gui_out_queue:multiprocessing.Queue ,dec_arena_in:multiprocessing.Queue, gui_control_queue:multiprocessing.Queue, render:bool=False):
+    def run(self,num_runs,time_limit, arena_queue:mp.Queue, agents_queue:mp.Queue, gui_in_queue:mp.Queue, gui_out_queue:mp.Queue ,dec_arena_in:mp.Queue, gui_control_queue:mp.Queue, render:bool=False):
         pass
 
     def reset(self):
@@ -176,7 +177,7 @@ class SolidArena(Arena):
             out.update({entities[0].entity():(shapes,positions)})
         return out
         
-    def run(self,num_runs,time_limit, arena_queue:multiprocessing.Queue, agents_queue:multiprocessing.Queue, gui_in_queue:multiprocessing.Queue, gui_out_queue:multiprocessing.Queue,dec_arena_in:multiprocessing.Queue, gui_control_queue:multiprocessing.Queue,render:bool=False):
+    def run(self,num_runs,time_limit, arena_queue:mp.Queue, agents_queue:mp.Queue, gui_in_queue:mp.Queue, gui_out_queue:mp.Queue,dec_arena_in:mp.Queue, gui_control_queue:mp.Queue,render:bool=False):
         """Function to run the arena in a separate process"""
         ticks_limit = time_limit*self.ticks_per_second + 1 if time_limit > 0 else 0
         for run in range(1, num_runs + 1):

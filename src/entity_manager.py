@@ -1,4 +1,4 @@
-import multiprocessing
+import multiprocessing as mp
 from random import Random
 from geometry_utils.vector3D import Vector3D
 
@@ -68,7 +68,7 @@ class EntityManager:
     def close(self):
         pass
 
-    def run(self, num_runs, time_limit, arena_queue: multiprocessing.Queue, agents_queue: multiprocessing.Queue, gui_out_queue: multiprocessing.Queue, dec_agents_in: multiprocessing.Queue, dec_agents_out: multiprocessing.Queue, render: bool = False):
+    def run(self, num_runs, time_limit, arena_queue: mp.Queue, agents_queue: mp.Queue, gui_out_queue: mp.Queue, dec_agents_in: mp.Queue, dec_agents_out: mp.Queue, render: bool = False):
         ticks_per_second = 1
         for (_, entities) in self.agents.values():
             ticks_per_second = entities[0].ticks()

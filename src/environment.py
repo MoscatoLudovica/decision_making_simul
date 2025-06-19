@@ -1,4 +1,5 @@
-import logging, multiprocessing, psutil, gc
+import logging, psutil, gc
+import multiprocessing as mp
 from config import Config
 from entity import EntityFactory
 from arena import ArenaFactory
@@ -58,15 +59,15 @@ class SingleProcessEnvironment(Environment):
 
     def start(self):
         for exp in self.experiments:
-            arena_queue = multiprocessing.Queue()
-            agents_queue = multiprocessing.Queue()
-            dec_arena_in = multiprocessing.Queue()
-            dec_agents_in = multiprocessing.Queue()
-            dec_agents_out = multiprocessing.Queue()
-            gui_in_queue = multiprocessing.Queue()
-            gui_out_arena_queue = multiprocessing.Queue()
-            gui_out_agents_queue = multiprocessing.Queue()
-            gui_control_queue = multiprocessing.Queue()
+            arena_queue = mp.Queue()
+            agents_queue = mp.Queue()
+            dec_arena_in = mp.Queue()
+            dec_agents_in = mp.Queue()
+            dec_agents_out = mp.Queue()
+            gui_in_queue = mp.Queue()
+            gui_out_arena_queue = mp.Queue()
+            gui_out_agents_queue = mp.Queue()
+            gui_control_queue = mp.Queue()
             arena = self.arena_init(exp)
             agents = self.agents_init(exp)
             arena_shape = arena.get_shape()
@@ -74,14 +75,14 @@ class SingleProcessEnvironment(Environment):
             render_enabled = self.render[0]
             collision_detector = CollisionDetector(arena_shape, self.collisions)
             entity_manager = EntityManager(agents, arena_shape)
-            arena_process = multiprocessing.Process(target=arena.run, args=(self.num_runs, self.time_limit, arena_queue, agents_queue, gui_in_queue, gui_out_arena_queue, dec_arena_in, gui_control_queue, render_enabled))
-            agents_process = multiprocessing.Process(target=entity_manager.run, args=(self.num_runs, self.time_limit, arena_queue, agents_queue, gui_out_agents_queue, dec_agents_in, dec_agents_out, render_enabled))
-            detector_process = multiprocessing.Process(target=collision_detector.run, args=(dec_agents_in, dec_agents_out, dec_arena_in))
+            arena_process = mp.Process(target=arena.run, args=(self.num_runs, self.time_limit, arena_queue, agents_queue, gui_in_queue, gui_out_arena_queue, dec_arena_in, gui_control_queue, render_enabled))
+            agents_process = mp.Process(target=entity_manager.run, args=(self.num_runs, self.time_limit, arena_queue, agents_queue, gui_out_agents_queue, dec_agents_in, dec_agents_out, render_enabled))
+            detector_process = mp.Process(target=collision_detector.run, args=(dec_agents_in, dec_agents_out, dec_arena_in))
 
             killed = 0
             if render_enabled:
                 self.render[1]["_id"] = "abstract" if arena_id in (None, "none") else self.gui_id
-                gui_process = multiprocessing.Process(target=self.run_gui, args=(self.render[1], arena_shape.vertices(), arena_shape.color(), gui_in_queue, gui_control_queue)) # type: ignore
+                gui_process = mp.Process(target=self.run_gui, args=(self.render[1], arena_shape.vertices(), arena_shape.color(), gui_in_queue, gui_control_queue)) # type: ignore
                 gui_process.start()
                 if arena_id not in ("abstract", "none", None):
                     detector_process.start()
