@@ -38,7 +38,7 @@
         },
         "agents":{
             "movable_0":{
-                "ticks_per_second": 30,
+                "ticks_per_second": 20,
                 "spin_per_tick": 10,
                 "spin_pre_run": false,
                 "spin_pre_run_steps": 1000,
