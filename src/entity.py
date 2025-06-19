@@ -267,6 +267,7 @@ class MovableAgent(StaticAgent):
             self.perception_global_inhibition = config_elem.get("perception_global_inhibition",0)
             self.group_angles = np.linspace(0, 2 * _PI, self.num_groups, endpoint=False)
         else:
+            self.pre_run = False
             self.max_turning_ticks = 160
             self.standard_motion_steps = 5*16
             self.crw_exponent = config_elem.get("crw_exponent",1) # 2 is brownian like motion

@@ -140,8 +140,18 @@ class GUI_2D(QWidget):
 
     def update_spins_plot(self):
         if not (self.clicked_spin and self.agents_spins is not None):
+            self.clicked_spin = None
+            self._main_layout.removeWidget(self.canvas)
+            self.canvas.setParent(None)
+            self.canvas_visible = False
             return
         spin = self.agents_spins.get(self.clicked_spin[0])[self.clicked_spin[1]]
+        if spin is None:
+            self.clicked_spin = None
+            self._main_layout.removeWidget(self.canvas)
+            self.canvas.setParent(None)
+            self.canvas_visible = False
+            return
         group_mean_spins = spin[0].mean(axis=1)
         colors_spins = coolwarm(group_mean_spins)
         group_mean_perception = spin[2].reshape(spin[1][1], spin[1][2]).mean(axis=1)

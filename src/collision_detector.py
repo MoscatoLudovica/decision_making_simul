@@ -1,4 +1,4 @@
-import multiprocessing
+import multiprocessing as mp
 from geometry_utils.vector3D import Vector3D
 
 class CollisionDetector:
@@ -6,7 +6,7 @@ class CollisionDetector:
         self.arena_shape = arena_shape
         self.collisions = collisions
 
-    def run(self, dec_agents_in: multiprocessing.Queue, dec_agents_out: multiprocessing.Queue, dec_arena_in: multiprocessing.Queue):
+    def run(self, dec_agents_in: mp.Queue, dec_agents_out: mp.Queue, dec_arena_in: mp.Queue):
         self.agents, self.objects = {}, {}
         while True:
             out = {}
@@ -54,7 +54,7 @@ class CollisionDetector:
                                         separations.append((norm_delta, penetration_depth * 0.1))
                                         correction = correction + velocity_projection
                             # Collisioni con oggetti statici
-                            for dshapes, _, _, dpositions in self.objects.values():
+                            for dshapes, dpositions in self.objects.values():
                                 for m, dshape in enumerate(dshapes):
                                     dposition = dpositions[m]
                                     delta = Vector3D(position.x - dposition.x, position.y - dposition.y, 0)

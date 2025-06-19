@@ -1,6 +1,6 @@
 {
     "environment":{
-        "collisions": false,
+        "collisions": true,
         "ticks_per_second": 10,
         "time_limit": 100,
         "num_runs": 1,
@@ -42,7 +42,7 @@
                 "spin_per_tick": 10,
                 "spin_pre_run": true,
                 "spin_pre_run_steps": 1000,
-                "number": [1],
+                "number": [90],
                 "position": [[0, 0.4, 0]],
                 "orientation": [[0,0,90]],
                 "shape": "cylinder",
@@ -51,8 +51,8 @@
                 "height": 0.02,
                 "diameter": 0.033,
                 "color": "blue",
-                "detection": "visual",
-                "moving_behavior":"spin_model",
+                "detection": "GPS",
+                "moving_behavior":"random_way_point",
                 "perception_width": [0.2],
                 "num_groups": [32],
                 "num_spins_per_group": [10],
