@@ -278,7 +278,7 @@ class MovableAgent(StaticAgent):
             self.perception = None
             self.spin_system = SpinSystem(self.random_generator,self.num_groups, self.num_spins_per_group,self.config_elem.get("T",0.1),
                                           self.config_elem.get("J",4),self.config_elem.get("nu",0.5),self.config_elem.get("p_spin_up",0.5),
-                                          self.config_elem.get("time_delay",0),self.config_elem.get("dynamics","metropolis"),int(self.config_elem.get("spin_history",10)))
+                                          self.config_elem.get("time_delay",1),self.config_elem.get("dynamics","metropolis"))
         else:
             self.turning_ticks = 0
             self.forward_ticks = 0

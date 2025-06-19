@@ -27,7 +27,6 @@ class Arena():
     def __init__(self, config_elem:Config):
         self.random_generator = Random()
         self.ticks_per_second = int(config_elem.environment.get("ticks_per_second", 10))
-        print(self.ticks_per_second)
         self.random_seed = config_elem.arena.get("random_seed",-1)
         self._id = "none" if config_elem.arena.get("_id") == "abstract" else config_elem.arena.get("_id","none") 
         self.objects = {object_type: (config_elem.environment.get("objects",{}).get(object_type),[]) for object_type in config_elem.environment.get("objects",{}).keys()}

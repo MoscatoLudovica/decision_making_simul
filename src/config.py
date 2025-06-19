@@ -35,7 +35,17 @@ class Config:
                 for n in entity[field]:
                     if not isinstance(n, int) or n <= 0:
                         raise ValueError(f"All elements in '{field}' must be positive integers in {entity.get('_id', 'entity')}")
-        
+        if 'time_delay' in entity:
+            td = entity['time_delay']
+            if isinstance(td, list):
+                if not td:
+                    raise ValueError("Optional field 'time_delay' must not be an empty list in {}".format(entity.get('_id', 'entity')))
+                for v in td:
+                    if not isinstance(v, int) or v < 1:
+                        raise ValueError("All elements in optional field 'time_delay' must be integers >= 1 in {}".format(entity.get('_id', 'entity')))
+            else:
+                if not isinstance(td, int) or td < 1:
+                    raise ValueError("Optional field 'time_delay' must be an integer >= 1 in {}".format(entity.get('_id', 'entity')))
         # Controllo specifico per il campo opzionale 'position'
         if 'position' in entity:
             pos = entity['position']

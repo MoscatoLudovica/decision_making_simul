@@ -5,7 +5,7 @@ import numpy as np
 _PI = math.pi
 
 class SpinSystem:
-    def __init__(self, random_generator, num_groups, num_spins_per_group, T, J, nu, p_spin_up=0.5, time_delay=0, dynamics='metropolis', history_length=10):
+    def __init__(self, random_generator, num_groups, num_spins_per_group, T, J, nu, p_spin_up=0.5, time_delay:int=1, dynamics='metropolis'):
         self.random_generator = random_generator
         self.num_groups = num_groups
         self.num_spins_per_group = num_spins_per_group
@@ -15,8 +15,7 @@ class SpinSystem:
         self.p_spin_up = p_spin_up
         self.spins = self._random_spins()
         self.spins_history = [self.spins.copy()]
-        self.history_length = history_length
-        self.time_delay = time_delay
+        self.history_length = time_delay
         self.dynamics = dynamics
         group_angles = np.linspace(0, 2 * _PI, num_groups, endpoint=False)
         self.angles = np.repeat(group_angles, self.num_spins_per_group)
@@ -46,10 +45,10 @@ class SpinSystem:
         external_field_contribution = -np.dot(self.external_field, state_flat)
         return H_spin_interactions + external_field_contribution
 
-    def step(self, timedelay=True, dt=0.1, tau=33):
+    def step(self,timedelay=True, dt=0.1, tau=33):
         i = Random.randint(self.random_generator, 0, self.num_groups - 1)
         j = Random.randint(self.random_generator, 0, self.num_spins_per_group - 1)
-        if timedelay and self.spins_history:
+        if timedelay:
             hybrid_state = self.spins_history[0].copy()
             hybrid_state[i, j] = self.spins[i, j]
             state_to_use = hybrid_state
