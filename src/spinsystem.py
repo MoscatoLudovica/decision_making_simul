@@ -3,8 +3,9 @@ from random import Random
 import numpy as np
 
 _PI = math.pi
+
 class SpinSystem:
-    def __init__(self, random_generator, num_groups, num_spins_per_group, T, J, nu, p_spin_up=0.5, time_delay=0, dynamics='metropolis'):
+    def __init__(self, random_generator, num_groups, num_spins_per_group, T, J, nu, p_spin_up=0.5, time_delay=0, dynamics='metropolis', history_length=10):
         self.random_generator = random_generator
         self.num_groups = num_groups
         self.num_spins_per_group = num_spins_per_group
@@ -12,17 +13,23 @@ class SpinSystem:
         self.J = J
         self.nu = nu
         self.p_spin_up = p_spin_up
-        self.spins = np.array([[1 if Random.uniform(self.random_generator, 0, 1) < self.p_spin_up else 0
-                                for _ in range(self.num_spins_per_group)] for _ in range(self.num_groups)], dtype=np.uint8)
+        self.spins = self._random_spins()
         self.spins_history = [self.spins.copy()]
+        self.history_length = history_length
         self.time_delay = time_delay
         self.dynamics = dynamics
         group_angles = np.linspace(0, 2 * _PI, num_groups, endpoint=False)
         self.angles = np.repeat(group_angles, self.num_spins_per_group)
-        self.external_field = np.zeros(self.num_groups * self.num_spins_per_group)
+        self.external_field = np.zeros(self.num_groups * self.num_spins_per_group, dtype=np.float32)
         self.avg_direction = None
-        # Precalcola la matrice J
         self.J_matrix = self._precompute_j_matrix()
+
+    def _random_spins(self):
+        # Usa Random per generare una matrice di spin in modo vettoriale
+        rand_vals = np.array([Random.uniform(self.random_generator, 0, 1)
+                              for _ in range(self.num_groups * self.num_spins_per_group)])
+        spins = (rand_vals < self.p_spin_up).astype(np.uint8)
+        return spins.reshape(self.num_groups, self.num_spins_per_group)
 
     def _precompute_j_matrix(self):
         angle_diff_matrix = np.abs(np.subtract.outer(self.angles, self.angles))
@@ -34,18 +41,16 @@ class SpinSystem:
 
     def calculate_hamiltonian(self, state):
         state_flat = state.ravel()
-        spin_interaction_matrix = np.outer(state_flat, state_flat)
-        H_spin_interactions = -(self.J / (self.num_spins_per_group * self.num_groups)) * (self.J_matrix * spin_interaction_matrix)
-        H_spin_interactions = np.sum(np.triu(H_spin_interactions, 1))
+        interaction = state_flat[:, None] * state_flat[None, :]
+        H_spin_interactions = -(self.J / (self.num_spins_per_group * self.num_groups)) * np.sum(np.triu(self.J_matrix * interaction, 1))
         external_field_contribution = -np.dot(self.external_field, state_flat)
         return H_spin_interactions + external_field_contribution
 
     def step(self, timedelay=True, dt=0.1, tau=33):
         i = Random.randint(self.random_generator, 0, self.num_groups - 1)
         j = Random.randint(self.random_generator, 0, self.num_spins_per_group - 1)
-        # Usa direttamente la vista 1D se serve
         if timedelay and self.spins_history:
-            hybrid_state = self.spins_history[-1].copy()
+            hybrid_state = self.spins_history[0].copy()
             hybrid_state[i, j] = self.spins[i, j]
             state_to_use = hybrid_state
         else:
@@ -61,6 +66,8 @@ class SpinSystem:
         else:
             raise ValueError(f"Unknown dynamics type: {self.dynamics}")
         self.spins_history.append(self.spins.copy())
+        if len(self.spins_history) > self.history_length:
+            self.spins_history.pop(0)
 
     def _metropolis_acceptance(self, i, j, delta_h):
         if delta_h <= 0 or Random.uniform(self.random_generator, 0, 1) < math.exp(-delta_h / self.T):
@@ -86,6 +93,9 @@ class SpinSystem:
             return None
         unit_vectors = np.exp(1j * self.angles)
         active_mask = flattened_spins == 1
+        if not np.any(active_mask):
+            self.avg_direction = None
+            return None
         sum_vector = np.sum(unit_vectors[active_mask])
         if sum_vector != 0:
             self.avg_direction = math.atan2(sum_vector.imag, sum_vector.real)
@@ -100,6 +110,8 @@ class SpinSystem:
         flattened_spins = self.spins.ravel()
         unit_vectors = np.exp(1j * self.angles)
         active_mask = flattened_spins == 1
+        if not np.any(active_mask):
+            return float('inf')
         sum_vector = np.sum(unit_vectors[active_mask])
         magnitude = abs(sum_vector)
         return 1 / magnitude if magnitude != 0 else float('inf')
@@ -117,12 +129,11 @@ class SpinSystem:
         return None
 
     def reset_spins(self):
-        self.spins = np.array([[1 if Random.uniform(self.random_generator, 0, 1) < self.p_spin_up else 0
-                                for _ in range(self.num_spins_per_group)] for _ in range(self.num_groups)], dtype=np.uint8)
+        self.spins = self._random_spins()
         self.spins_history = [self.spins.copy()]
 
     def update_external_field(self, perceptual_outputs):
-        self.external_field = perceptual_outputs
+        self.external_field = np.asarray(perceptual_outputs, dtype=np.float32)
 
     def get_states(self):
         return self.spins
@@ -138,6 +149,8 @@ class SpinSystem:
             raise ValueError(f"Invalid shape for spin states. Expected {self.spins.shape}, but got {states.shape}.")
         self.spins = states.copy()
         self.spins_history.append(self.spins.copy())
+        if len(self.spins_history) > self.history_length:
+            self.spins_history.pop(0)
 
     def sense_other_ring(self, other_ring_states, gain=1.0):
-        self.external_field = gain * other_ring_states.ravel()
+        self.external_field = gain * np.asarray(other_ring_states, dtype=np.float32).ravel()

@@ -2,7 +2,7 @@
     "environment":{
         "collisions": false,
         "ticks_per_second": 10,
-        "time_limit": 100,
+        "time_limit": 0,
         "num_runs": 1,
         "render": true,
         "auto_close_gui": true,
@@ -42,7 +42,7 @@
                 "spin_per_tick": 10,
                 "spin_pre_run": true,
                 "spin_pre_run_steps": 1000,
-                "number": [2],
+                "number": [1],
                 "position": [[0, 0.4, 0]],
                 "orientation": [[0,0,90]],
                 "shape": "cylinder",
