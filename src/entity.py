@@ -53,11 +53,37 @@ class Object(Entity):
             raise ValueError(f"Invalid object type: {self.entity_type}")
 
 class Agent(Entity):
-    def __init__(self,entity_type:str, config_elem: dict,_id:int=0):
-        super().__init__(entity_type,config_elem,_id)
+    def __init__(self, entity_type:str, config_elem:dict, _id:int=0):
+        super().__init__(entity_type, config_elem, _id)
         self.random_generator = Random()
-        self.ticks_per_second = config_elem.get("ticks_per_second",31)
-        self.color = config_elem.get("color","blue")
+        self.ticks_per_second = config_elem.get("ticks_per_second", 31)
+        self.color = config_elem.get("color", "blue")
+        # --- Messaggistica ---
+        self.messages_config = config_elem.get("messages", {})
+        self.msg_enable = self.messages_config.get("enable", False)
+        self.msg_comm_range = self.messages_config.get("comm_range", 0.1)
+        self.msg_type = self.messages_config.get("type", "broadcast")
+        self.msg_kind = self.messages_config.get("kind", "anonymous")
+        self.msgs_per_sec = self.messages_config.get("messages_per_seconds", 1)
+        self.msg_ticks_interval = max(1, int(self.ticks_per_second / self.msgs_per_sec))
+        self.message_bus = None
+        self.message = {}
+
+    def set_message_bus(self, bus):
+        self.message_bus = bus
+
+    def should_send_message(self, tick):
+        return self.msg_enable and ((tick - 1) % self.msg_ticks_interval == 0)
+
+    def send_message(self,tick):
+        if self.msg_enable and self.message_bus:
+            self.message = {"tick":tick}
+            self.message_bus.send_message(self, self.message)
+
+    def receive_messages(self):
+        if self.msg_enable and self.message_bus:
+            return self.message_bus.receive_messages(self)
+        return []
     
     def ticks(self): return self.ticks_per_second
     
@@ -257,28 +283,40 @@ class MovableAgent(StaticAgent):
         self.prev_goal_distance = 0
         self.detection = config_elem.get("detection","GPS")
         self.moving_behavior = config_elem.get("moving_behavior","random_walk")
-        self.pre_run = config_elem.get("spin_pre_run",False)
-        if self.detection in ("visual"):
-            self.spin_per_tick = config_elem.get("spin_per_tick",1)
-            self.spin_pre_run_steps = config_elem.get("spin_pre_run_steps",100)
-            self.perception_width = config_elem.get("perception_width",0.1)
-            self.num_groups = config_elem.get("num_groups",32)
-            self.num_spins_per_group = config_elem.get("num_spins_per_group",10)
-            self.perception_global_inhibition = config_elem.get("perception_global_inhibition",0)
+        self.pre_run = False  # default
+
+        if self.moving_behavior == "spin_model":
+            self.spin_model_params = config_elem.get("spin_model", {})
+            self.pre_run = self.spin_model_params.get("spin_pre_run", False)
+            self.spin_per_tick = self.spin_model_params.get("spin_per_tick", 3)
+            self.spin_pre_run_steps = self.spin_model_params["spin_pre_run_steps"]
+            self.perception_width = self.spin_model_params["perception_width"][0] if isinstance(self.spin_model_params["perception_width"], list) else self.spin_model_params["perception_width"]
+            self.num_groups = self.spin_model_params["num_groups"][0] if isinstance(self.spin_model_params["num_groups"], list) else self.spin_model_params["num_groups"]
+            self.num_spins_per_group = self.spin_model_params["num_spins_per_group"][0] if isinstance(self.spin_model_params["num_spins_per_group"], list) else self.spin_model_params["num_spins_per_group"]
+            self.perception_global_inhibition = self.spin_model_params["perception_global_inhibition"][0] if isinstance(self.spin_model_params["perception_global_inhibition"], list) else self.spin_model_params["perception_global_inhibition"]
             self.group_angles = np.linspace(0, 2 * _PI, self.num_groups, endpoint=False)
         else:
+            # Parametri per altri moving_behavior
             self.pre_run = False
             self.max_turning_ticks = 160
             self.standard_motion_steps = 5*16
-            self.crw_exponent = config_elem.get("crw_exponent",1) # 2 is brownian like motion
-            self.levy_exponent = config_elem.get("levy_exponent",1.75) # 0 go straight often
-    
+            self.crw_exponent = config_elem.get("crw_exponent",1)
+            self.levy_exponent = config_elem.get("levy_exponent",1.75)
+
     def reset(self):
-        if self.detection in ("visual"):
+        if self.moving_behavior == "spin_model":
             self.perception = None
-            self.spin_system = SpinSystem(self.random_generator,self.num_groups, self.num_spins_per_group,self.config_elem.get("T",0.1),
-                                          self.config_elem.get("J",4),self.config_elem.get("nu",0.5),self.config_elem.get("p_spin_up",0.5),
-                                          self.config_elem.get("time_delay",1),self.config_elem.get("dynamics","metropolis"))
+            self.spin_system = SpinSystem(
+                self.random_generator,
+                self.num_groups,
+                self.num_spins_per_group,
+                self.spin_model_params["T"][0] if isinstance(self.spin_model_params["T"], list) else self.spin_model_params["T"],
+                self.spin_model_params["J"][0] if isinstance(self.spin_model_params["J"], list) else self.spin_model_params["J"],
+                self.spin_model_params["nu"][0] if isinstance(self.spin_model_params["nu"], list) else self.spin_model_params["nu"],
+                self.spin_model_params["p_spin_up"][0] if isinstance(self.spin_model_params["p_spin_up"], list) else self.spin_model_params["p_spin_up"],
+                self.spin_model_params["time_delay"][0] if isinstance(self.spin_model_params["time_delay"], list) else self.spin_model_params["time_delay"],
+                self.spin_model_params["dynamics"][0] if isinstance(self.spin_model_params["dynamics"], list) else self.spin_model_params["dynamics"]
+            )
         else:
             self.turning_ticks = 0
             self.forward_ticks = 0
@@ -443,7 +481,6 @@ class MovableAgent(StaticAgent):
             self.max_absolute_velocity * -sin_angle,
             0
         )
-
 
 def normalize_angle(angle: float):
     """Normalizza l'angolo tra -180 e 180 gradi."""

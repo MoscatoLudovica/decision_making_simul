@@ -55,7 +55,18 @@ class Config:
             ori = entity['orientation']
             if not (isinstance(ori, list) and all(isinstance(o, list) and len(o) in (1, 3) and all(isinstance(x, (int, float)) for x in o) for o in ori)):
                 raise ValueError(f"Optional field 'orientation' must be a list of [z] o [x, y, z] arrays in {entity.get('_id', 'entity')}")
-
+        if entity.get("moving_behavior", None) == "spin_model":
+            spin_model = entity.get("spin_model", None)
+            if not spin_model:
+                raise ValueError(f"Agent '{entity.get('_id', 'entity')}' with moving_behavior 'spin_model' must have a 'spin_model' field")
+            required_spin_fields = [
+                "spin_per_tick","spin_pre_run", "spin_pre_run_steps", "perception_width", "num_groups",
+                "num_spins_per_group", "perception_global_inhibition", "T", "J", "nu",
+                "p_spin_up", "time_delay", "dynamics"
+            ]
+            for field in required_spin_fields:
+                if field not in spin_model:
+                    raise ValueError(f"Missing '{field}' in spin_model config for agent {entity.get('_id', 'entity')}")
         # Trova tutti i campi-lista (sia obbligatori che opzionali), ESCLUDENDO 'position'
         list_fields = [f for f in required_fields + optional_fields if f in entity and isinstance(entity[f], list) and f != 'position' and f != 'orientation']
         # Se nessun campo-lista (escluso position), restituisci l'entità così com'è
@@ -120,10 +131,7 @@ class Config:
 
         # Parsing e controlli su agents
         agent_required_fields = ['ticks_per_second', 'number']
-        agent_optional_fields = [
-            'perception_width', 'num_groups', 'num_spins_per_group', 'perception_global_inhibition',
-            'T', 'J', 'nu', 'p_spin_up', 'time_delay', 'dynamics','position','orientation'
-        ]
+        agent_optional_fields = ['position','orientation']
         try:
             for k, v in environment['agents'].items():
                 if k.startswith('static_') or k.startswith('movable_'):

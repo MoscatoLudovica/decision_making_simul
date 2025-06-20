@@ -1,6 +1,6 @@
 {
     "environment":{
-        "collisions": false,
+        "collisions": true,
         "ticks_per_second": 10,
         "time_limit": 0,
         "num_runs": 1,
@@ -39,32 +39,22 @@
         "agents":{
             "movable_0":{
                 "ticks_per_second": 20,
-                "number": [1],
-                "position": [[0, 0.4, 0]],
-                "orientation": [[0,0,90]],
+                "number": [20],
                 "shape": "cylinder",
                 "linear_velocity": 0.03,
                 "angular_velocity": 45,
                 "height": 0.02,
                 "diameter": 0.033,
                 "color": "blue",
-                "detection": "visual",
-                "moving_behavior":"spin_model",
-                "spin_model":{
-                    "spin_per_tick": 10,
-                    "spin_pre_run": false,
-                    "spin_pre_run_steps": 1000,
-                    "perception_width": [0.2],
-                    "num_groups": [32],
-                    "num_spins_per_group": [10],
-                    "perception_global_inhibition": [0],
-                    "T": [0.3],
-                    "J": [30],
-                    "nu": [0.5],
-                    "p_spin_up": [0.5],
-                    "time_delay": [1],
-                    "dynamics": ["metropolis"]
-                }
+                "detection": "GPS",
+                "moving_behavior":"random_way_point",
+                "messages": {
+                    "messages_per_seconds": 2,
+                    "enable": true,
+                    "comm_range": 0.1,
+                    "type": "broadcast",
+                    "kind": "id"
+                }      
             }
         }   
     }

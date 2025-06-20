@@ -1,11 +1,25 @@
 import multiprocessing as mp
+from messagebus import MessageBus
 from random import Random
 from geometry_utils.vector3D import Vector3D
-
+# for messaging positions need to be given at each step
 class EntityManager:
     def __init__(self, agents, arena_shape):
         self.agents = agents
         self.arena_shape = arena_shape
+        self.message_buses = {}
+        for agent_type, (config,entities) in self.agents.items():
+            # Verifica se almeno una entità ha la messaggistica abilitata
+            any_msg_enabled = any(getattr(e, "msg_enable", False) for e in entities)
+            if any_msg_enabled:
+                # Crea un bus per questo tipo di entità
+                bus = MessageBus(entities,config.get("messages",{}))
+                self.message_buses[agent_type] = bus
+                for e in entities:
+                    if hasattr(e, "set_message_bus"):
+                        e.set_message_bus(bus)
+            else:
+                self.message_buses[agent_type] = None
 
     def initialize(self, random_seed, objects):
         min_v = self.arena_shape.min_vert()
@@ -102,8 +116,16 @@ class EntityManager:
                         agents_queue.put(agents_data)
                 if arena_queue.qsize() > 0:
                     data_in = arena_queue.get()
+                for agent_type, (config,entities) in self.agents.items():
+                    bus = self.message_buses.get(agent_type)
+                    if bus:
+                        bus.update_grid(entities)
                 for _, entities in self.agents.values():
                     for entity in entities:
+                        if getattr(entity, "msg_enable", False) and entity.message_bus:
+                            if entity.should_send_message(t):
+                                entity.send_message(t)
+                            entity.receive_messages()
                         entity.run(t, self.arena_shape, data_in["objects"])
                 agents_data = {
                     "status": [t, ticks_per_second],
@@ -113,6 +135,10 @@ class EntityManager:
                 detector_data = {
                     "agents": self.pack_detector_data()
                 }
+                for agent_type, (config,entities) in self.agents.items():
+                    bus = self.message_buses.get(agent_type)
+                    if bus:
+                        bus.reset_mailboxes()
                 agents_queue.put(agents_data)
                 dec_agents_in.put(detector_data)
                 dec_data_in = dec_agents_out.get()
