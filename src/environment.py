@@ -65,8 +65,6 @@ class SingleProcessEnvironment(Environment):
             dec_agents_in = mp.Queue()
             dec_agents_out = mp.Queue()
             gui_in_queue = mp.Queue()
-            gui_out_arena_queue = mp.Queue()
-            gui_out_agents_queue = mp.Queue()
             gui_control_queue = mp.Queue()
             arena = self.arena_init(exp)
             agents = self.agents_init(exp)
@@ -75,14 +73,14 @@ class SingleProcessEnvironment(Environment):
             render_enabled = self.render[0]
             collision_detector = CollisionDetector(arena_shape, self.collisions)
             entity_manager = EntityManager(agents, arena_shape)
-            arena_process = mp.Process(target=arena.run, args=(self.num_runs, self.time_limit, arena_queue, agents_queue, gui_in_queue, gui_out_arena_queue, dec_arena_in, gui_control_queue, render_enabled))
-            agents_process = mp.Process(target=entity_manager.run, args=(self.num_runs, self.time_limit, arena_queue, agents_queue, gui_out_agents_queue, dec_agents_in, dec_agents_out, render_enabled))
+            arena_process = mp.Process(target=arena.run, args=(self.num_runs, self.time_limit, arena_queue, agents_queue, gui_in_queue, dec_arena_in, gui_control_queue, render_enabled))
+            agents_process = mp.Process(target=entity_manager.run, args=(self.num_runs, self.time_limit, arena_queue, agents_queue, dec_agents_in, dec_agents_out, render_enabled))
             detector_process = mp.Process(target=collision_detector.run, args=(dec_agents_in, dec_agents_out, dec_arena_in))
 
             killed = 0
             if render_enabled:
                 self.render[1]["_id"] = "abstract" if arena_id in (None, "none") else self.gui_id
-                gui_process = mp.Process(target=self.run_gui, args=(self.render[1], arena_shape.vertices(), arena_shape.color(), gui_in_queue, gui_control_queue)) # type: ignore
+                gui_process = mp.Process(target=self.run_gui, args=(self.render[1], arena_shape.vertices(), arena_shape.color(), gui_in_queue, gui_control_queue))
                 gui_process.start()
                 if arena_id not in ("abstract", "none", None):
                     detector_process.start()
@@ -102,6 +100,10 @@ class SingleProcessEnvironment(Environment):
                         if agents_alive: agents_process.terminate()
                         if gui_alive: gui_process.terminate()
                         if detector_alive: detector_process.terminate()
+                        if arena_process.pid is not None: arena_process.join()
+                        if agents_process.pid is not None: agents_process.join()
+                        if detector_process.pid is not None: detector_process.join()
+                        if gui_process.pid is not None: gui_process.join()
                         arena.close()
                         entity_manager.close()
                         raise RuntimeError("A subprocess exited unexpectedly.")
@@ -110,6 +112,10 @@ class SingleProcessEnvironment(Environment):
                         if arena_alive: arena_process.terminate()
                         if gui_alive: gui_process.terminate()
                         if detector_alive: detector_process.terminate()
+                        if arena_process.pid is not None: arena_process.join()
+                        if agents_process.pid is not None: agents_process.join()
+                        if detector_process.pid is not None: detector_process.join()
+                        if gui_process.pid is not None: gui_process.join()
                         arena.close()
                         entity_manager.close()
                         raise RuntimeError("A subprocess exited unexpectedly.")
@@ -118,6 +124,10 @@ class SingleProcessEnvironment(Environment):
                         if arena_alive: arena_process.terminate()
                         if agents_alive: agents_process.terminate()
                         if detector_alive: detector_process.terminate()
+                        if arena_process.pid is not None: arena_process.join()
+                        if agents_process.pid is not None: agents_process.join()
+                        if detector_process.pid is not None: detector_process.join()
+                        if gui_process.pid is not None: gui_process.join()
                         arena.close()
                         entity_manager.close()
                         raise RuntimeError("A subprocess exited unexpectedly.")
@@ -125,8 +135,6 @@ class SingleProcessEnvironment(Environment):
                     if killed == 0 and gui_process.pid is not None:
                         gui_status = psutil.Process(gui_process.pid).status()
                         if gui_status in (psutil.STATUS_ZOMBIE, psutil.STATUS_DEAD):
-                            gui_out_arena_queue.put({"status": "end"})
-                            gui_out_agents_queue.put({"status": "end"})
                             killed = 1
                             if arena_alive: arena_process.terminate()
                             if agents_alive: agents_process.terminate()
@@ -142,16 +150,15 @@ class SingleProcessEnvironment(Environment):
                         entity_manager.close()
                         break
                 # Join all processes
-                if arena_process.is_alive(): arena_process.join()
-                if agents_process.is_alive(): agents_process.join()
-                if detector_process.is_alive(): detector_process.join()
-                if gui_process.is_alive(): gui_process.join()
+                if arena_process.pid is not None: arena_process.join()
+                if agents_process.pid is not None: agents_process.join()
+                if detector_process.pid is not None: detector_process.join()
+                if gui_process.pid is not None: gui_process.join()
             else:
                 if arena_id not in ("abstract", "none", None):
                     detector_process.start()
                 agents_process.start()
                 arena_process.start()
-                # Usa join con timeout per evitare busy waiting
                 while arena_process.is_alive() and agents_process.is_alive():
                     arena_process.join(timeout=0.1)
                     agents_process.join(timeout=0.1)
@@ -165,14 +172,15 @@ class SingleProcessEnvironment(Environment):
                     if arena_process.is_alive(): arena_process.terminate()
                     if detector_process.is_alive(): detector_process.terminate()
                 # Join all processes
-                if arena_process.is_alive(): arena_process.join()
-                if agents_process.is_alive(): agents_process.join()
-                if detector_process.is_alive(): detector_process.join()
+                if arena_process.pid is not None: arena_process.join()
+                if agents_process.pid is not None: agents_process.join()
+                if detector_process.pid is not None:
+                    detector_process.terminate()
+                    detector_process.join()
+                arena.close()
+                entity_manager.close()
                 if killed == 1:
-                    arena.close()
-                    entity_manager.close()
                     raise RuntimeError("A subprocess exited unexpectedly.")
-            # Garbage collection solo una volta per esperimento
             gc.collect()
         logging.info("All experiments completed successfully")
 
