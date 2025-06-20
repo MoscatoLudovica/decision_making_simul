@@ -33,7 +33,7 @@ class Arena():
         self.agents_shapes = {}
         self.agents_spins = {}
         self.data_handling = None
-        if config_elem.results.get("save",False): self.data_handling = DataHandlingFactory.create_data_handling(config_elem)
+        if config_elem.results.get("save",False) and not config_elem.environment.get("render",True): self.data_handling = DataHandlingFactory.create_data_handling(config_elem)
 
     def get_id(self):
         return self._id
@@ -62,7 +62,7 @@ class Arena():
             for n in range(config["number"]):
                 entities.append(EntityFactory.create_entity(entity_type="object_"+key,config_elem=config,_id=n))
                 
-    def run(self,num_runs,time_limit, arena_queue:mp.Queue, agents_queue:mp.Queue, gui_in_queue:mp.Queue, gui_out_queue:mp.Queue ,dec_arena_in:mp.Queue, gui_control_queue:mp.Queue, render:bool=False):
+    def run(self,num_runs,time_limit, arena_queue:mp.Queue, agents_queue:mp.Queue, gui_in_queue:mp.Queue, dec_arena_in:mp.Queue, gui_control_queue:mp.Queue, render:bool=False):
         pass
 
     def reset(self):
@@ -176,10 +176,11 @@ class SolidArena(Arena):
             out.update({entities[0].entity():(shapes,positions)})
         return out
         
-    def run(self,num_runs,time_limit, arena_queue:mp.Queue, agents_queue:mp.Queue, gui_in_queue:mp.Queue, gui_out_queue:mp.Queue,dec_arena_in:mp.Queue, gui_control_queue:mp.Queue,render:bool=False):
+    def run(self,num_runs,time_limit, arena_queue:mp.Queue, agents_queue:mp.Queue, gui_in_queue:mp.Queue,dec_arena_in:mp.Queue, gui_control_queue:mp.Queue,render:bool=False):
         """Function to run the arena in a separate process"""
         ticks_limit = time_limit*self.ticks_per_second + 1 if time_limit > 0 else 0
-        for run in range(1, num_runs + 1):
+        run = 1
+        while run < num_runs + 1:
             logging.info(f"Run number {run} started")
             arena_data = {
                 "status": [0,self.ticks_per_second],
@@ -197,18 +198,21 @@ class SolidArena(Arena):
             t = 1
             running = False if render else True
             step_mode = False
+            reset = False
             while True:
                 if ticks_limit > 0 and t >= ticks_limit: break
                 if render and gui_control_queue.qsize()>0:
                     cmd = gui_control_queue.get()
                     if cmd == "start":
                         running = True
-                        step_mode = False
                     elif cmd == "stop":
                         running = False
                     elif cmd == "step":
-                        step_mode = True
                         running = False
+                        step_mode = True
+                    elif cmd == "reset":
+                        running = False
+                        reset = True
                 arena_data = {
                     "status": [t,self.ticks_per_second],
                     "objects": self.pack_objects_data()
@@ -235,22 +239,35 @@ class SolidArena(Arena):
                     if self.data_handling is not None: self.data_handling.save(self.agents_shapes,self.agents_spins)
                     if render:
                         gui_in_queue.put({**arena_data, "agents_shapes": self.agents_shapes, "agents_spins": self.agents_spins})
-                        if gui_out_queue.qsize() > 0:
-                            gui_data = gui_out_queue.get()
-                            if gui_data["status"] == "end":
-                                self.close()
-                                break
                     step_mode = False
                     t += 1
+                elif reset:
+                    break
                 else: time.sleep(0.05)
-            if t < ticks_limit: break
+            if t < ticks_limit and not reset: break
             if run < num_runs:
-                self.increment_seed()
+                if not reset:
+                    run += 1
+                    self.increment_seed()
                 self.reset()
+                if reset:
+                    arena_data = {
+                                "status": "reset",
+                                "objects": self.pack_objects_data()
+                    }
+                    arena_queue.put(arena_data)
                 if not render: print("")
-            else:
+            elif not reset:
+                run += 1
                 self.close()
                 if not render: print("")
+            else:
+                self.reset()
+                arena_data = {
+                            "status": "reset",
+                            "objects": self.pack_objects_data()
+                }
+                arena_queue.put(arena_data)
         
     def reset(self):
         super().reset()

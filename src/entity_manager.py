@@ -2,7 +2,7 @@ import multiprocessing as mp
 from messagebus import MessageBus
 from random import Random
 from geometry_utils.vector3D import Vector3D
-# for messaging positions need to be given at each step
+
 class EntityManager:
     def __init__(self, agents, arena_shape):
         self.agents = agents
@@ -88,13 +88,15 @@ class EntityManager:
                 entity.close()
             self.message_buses.clear()
 
-    def run(self, num_runs, time_limit, arena_queue: mp.Queue, agents_queue: mp.Queue, gui_out_queue: mp.Queue, dec_agents_in: mp.Queue, dec_agents_out: mp.Queue, render: bool = False):
+    def run(self, num_runs, time_limit, arena_queue: mp.Queue, agents_queue: mp.Queue, dec_agents_in: mp.Queue, dec_agents_out: mp.Queue, render: bool = False):
         ticks_per_second = 1
         for (_, entities) in self.agents.values():
             ticks_per_second = entities[0].ticks()
             break
         ticks_limit = time_limit * ticks_per_second + 1 if time_limit > 0 else 0
-        for run in range(1, num_runs + 1):
+        run = 1
+        while run < num_runs + 1:
+            reset = False
             while arena_queue.qsize() == 0:
                 pass
             data_in = arena_queue.get()
@@ -116,9 +118,15 @@ class EntityManager:
             while True:
                 if ticks_limit > 0 and t >= ticks_limit:
                     break
+                if data_in["status"] == "reset":
+                    reset = True
+                    break
                 while data_in["status"][0] / data_in["status"][1] < t / ticks_per_second:
                     if arena_queue.qsize() > 0:
                         data_in = arena_queue.get()
+                        if data_in["status"] == "reset":
+                            reset = True
+                            break
                     agents_data = {
                         "status": [t, ticks_per_second],
                         "agents_shapes": self.get_agent_shapes(),
@@ -126,6 +134,7 @@ class EntityManager:
                     }
                     if agents_queue.qsize() == 0:
                         agents_queue.put(agents_data)
+                if reset: break
                 if arena_queue.qsize() > 0:
                     data_in = arena_queue.get()
                 for agent_type, _ in self.agents.items():
@@ -163,19 +172,16 @@ class EntityManager:
                     else:
                         for entity in entities:
                             entity.post_step(None)
-                if render and gui_out_queue.qsize() > 0:
-                    gui_data = gui_out_queue.get()
-                    if gui_data["status"] == "end":
-                        self.close()
-                        break
                 t += 1
-            if t < ticks_limit:
+            if t < ticks_limit and not reset:
                 break
             if run < num_runs:
-                if arena_queue.qsize() > 0:
+                if not reset and arena_queue.qsize() > 0:
                     data_in = arena_queue.get()
-            else:
+            elif not reset:
                 self.close()
+            if not reset:
+                run +=1
 
     def pack_detector_data(self) -> dict:
         out = {}

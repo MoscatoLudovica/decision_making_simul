@@ -35,13 +35,16 @@ class GUI_2D(QWidget):
         self.start_button = QPushButton("Start")
         self.stop_button = QPushButton("Stop")
         self.step_button = QPushButton("Step")
+        self.reset_button = QPushButton("Reset")
         self.button_layout.addWidget(self.start_button)
         self.button_layout.addWidget(self.stop_button)
         self.button_layout.addWidget(self.step_button)
+        self.button_layout.addWidget(self.reset_button)
         self._left_layout.addLayout(self.button_layout)
         self.start_button.clicked.connect(self.start_simulation)
         self.stop_button.clicked.connect(self.stop_simulation)
         self.step_button.clicked.connect(self.step_simulation)
+        self.reset_button.clicked.connect(self.reset_simulation)
         self.scale = 1
         self.view = QGraphicsView()
         self.view.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
@@ -128,6 +131,10 @@ class GUI_2D(QWidget):
     def start_simulation(self):
         self.gui_control_queue.put("start")
         self.running = True
+
+    def reset_simulation(self):
+        self.gui_control_queue.put("reset")
+        self.running = False
 
     def stop_simulation(self):
         self.gui_control_queue.put("stop")
