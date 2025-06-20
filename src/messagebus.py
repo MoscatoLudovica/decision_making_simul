@@ -8,7 +8,6 @@ class MessageBus:
         self.kind = self.global_config.get("kind", "anonymous")
         self.enable = self.global_config.get("enable", False)
         self.grid = SpatialGrid(self.comm_range)
-        # Mailbox: svuotata ad ogni tick
         self.mailboxes = {agent.get_name(): [] for agent in agent_entities}
 
     def update_grid(self,agents):
@@ -44,3 +43,8 @@ class MessageBus:
         messages = self.mailboxes[receiver.get_name()][:]
         self.mailboxes[receiver.get_name()] = []
         return messages
+    
+    def close(self):
+        self.grid.close()
+        del self.mailboxes,self.grid
+        return

@@ -481,7 +481,13 @@ class MovableAgent(StaticAgent):
             self.max_absolute_velocity * -sin_angle,
             0
         )
-
+    
+    def close(self):
+        super().close()
+        if self.moving_behavior == "spin_model":
+            del self.spin_system
+        return
+    
 def normalize_angle(angle: float):
     """Normalizza l'angolo tra -180 e 180 gradi."""
     return ((angle + 180) % 360) - 180

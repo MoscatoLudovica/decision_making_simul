@@ -80,7 +80,13 @@ class EntityManager:
                 entity.spin_pre_run(objects)
 
     def close(self):
-        pass
+        for agent_type, (config,entities) in self.agents.items():
+            bus = self.message_buses.get(agent_type)
+            if bus:
+                bus.close()
+            for entity in entities:
+                entity.close()
+            self.message_buses.clear()
 
     def run(self, num_runs, time_limit, arena_queue: mp.Queue, agents_queue: mp.Queue, gui_out_queue: mp.Queue, dec_agents_in: mp.Queue, dec_agents_out: mp.Queue, render: bool = False):
         ticks_per_second = 1
@@ -94,6 +100,12 @@ class EntityManager:
             data_in = arena_queue.get()
             if data_in["status"][0] == 0:
                 self.initialize(data_in["random_seed"], data_in["objects"])
+            for agent_type, _ in self.agents.items():
+                bus = self.message_buses.get(agent_type)
+                if bus:
+                    bus.reset_mailboxes()
+                    for _, (_,entities) in self.agents.items():
+                        bus.update_grid(entities)
             agents_data = {
                 "status": [0, ticks_per_second],
                 "agents_shapes": self.get_agent_shapes(),
@@ -116,10 +128,11 @@ class EntityManager:
                         agents_queue.put(agents_data)
                 if arena_queue.qsize() > 0:
                     data_in = arena_queue.get()
-                for agent_type, (config,entities) in self.agents.items():
+                for agent_type, _ in self.agents.items():
                     bus = self.message_buses.get(agent_type)
                     if bus:
-                        bus.update_grid(entities)
+                        for _, (_,entities) in self.agents.items():
+                            bus.update_grid(entities)
                 for _, entities in self.agents.values():
                     for entity in entities:
                         if getattr(entity, "msg_enable", False) and entity.message_bus:
@@ -135,7 +148,7 @@ class EntityManager:
                 detector_data = {
                     "agents": self.pack_detector_data()
                 }
-                for agent_type, (config,entities) in self.agents.items():
+                for agent_type, _ in self.agents.items():
                     bus = self.message_buses.get(agent_type)
                     if bus:
                         bus.reset_mailboxes()

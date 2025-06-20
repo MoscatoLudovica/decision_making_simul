@@ -27,3 +27,7 @@ class SpatialGrid:
                         if (other.get_position() - pos).magnitude() <= radius:
                             neighbors.append(other)
         return neighbors
+    
+    def close(self):
+        del self.grid, self.cell_size
+        return

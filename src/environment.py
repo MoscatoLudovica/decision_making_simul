@@ -102,19 +102,25 @@ class SingleProcessEnvironment(Environment):
                         if agents_alive: agents_process.terminate()
                         if gui_alive: gui_process.terminate()
                         if detector_alive: detector_process.terminate()
-                        break
+                        arena.close()
+                        entity_manager.close()
+                        raise RuntimeError("A subprocess exited unexpectedly.")
                     elif agents_exit not in (None, 0):
                         killed = 1
                         if arena_alive: arena_process.terminate()
                         if gui_alive: gui_process.terminate()
                         if detector_alive: detector_process.terminate()
-                        break
+                        arena.close()
+                        entity_manager.close()
+                        raise RuntimeError("A subprocess exited unexpectedly.")
                     elif render_enabled and gui_exit not in (None, 0):
                         killed = 1
                         if arena_alive: arena_process.terminate()
                         if agents_alive: agents_process.terminate()
                         if detector_alive: detector_process.terminate()
-                        break
+                        arena.close()
+                        entity_manager.close()
+                        raise RuntimeError("A subprocess exited unexpectedly.")
                     # Zombie/Dead GUI process
                     if killed == 0 and gui_process.pid is not None:
                         gui_status = psutil.Process(gui_process.pid).status()
@@ -125,21 +131,21 @@ class SingleProcessEnvironment(Environment):
                             if arena_alive: arena_process.terminate()
                             if agents_alive: agents_process.terminate()
                             if detector_alive: detector_process.terminate()
+                            arena.close()
+                            entity_manager.close()
                             break
                     if self.auto_close_gui and not arena_alive:
                         if agents_alive: agents_process.terminate()
                         if detector_alive: detector_process.terminate()
                         if gui_alive: gui_process.terminate()
-                        break
-                    if not gui_alive:
+                        arena.close()
+                        entity_manager.close()
                         break
                 # Join all processes
                 if arena_process.is_alive(): arena_process.join()
                 if agents_process.is_alive(): agents_process.join()
                 if detector_process.is_alive(): detector_process.join()
                 if gui_process.is_alive(): gui_process.join()
-                if killed == 1:
-                    raise RuntimeError("A subprocess exited unexpectedly.")
             else:
                 if arena_id not in ("abstract", "none", None):
                     detector_process.start()
@@ -163,6 +169,8 @@ class SingleProcessEnvironment(Environment):
                 if agents_process.is_alive(): agents_process.join()
                 if detector_process.is_alive(): detector_process.join()
                 if killed == 1:
+                    arena.close()
+                    entity_manager.close()
                     raise RuntimeError("A subprocess exited unexpectedly.")
             # Garbage collection solo una volta per esperimento
             gc.collect()
