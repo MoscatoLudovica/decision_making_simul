@@ -483,10 +483,7 @@ class MovableAgent(StaticAgent):
         )
     
     def close(self):
-        super().close()
-        if self.moving_behavior == "spin_model":
-            del self.spin_system
-        return
+        return super().close()
     
 def normalize_angle(angle: float):
     """Normalizza l'angolo tra -180 e 180 gradi."""

@@ -34,6 +34,9 @@ class EntityManager:
                 if not entity.get_orientation_from_dict():
                     rand_angle = Random.uniform(entity.get_random_generator(), 0.0, 360.0)
                     entity.set_start_orientation(Vector3D(0, 0, rand_angle))
+                else:
+                    orientation = entity.get_start_orientation()
+                    entity.set_start_orientation(orientation)
                 if not entity.get_position_from_dict():
                     count = 0
                     done = False
@@ -176,7 +179,7 @@ class EntityManager:
             if t < ticks_limit and not reset:
                 break
             if run < num_runs:
-                if not reset and arena_queue.qsize() > 0:
+                while arena_queue.qsize() > 1:
                     data_in = arena_queue.get()
             elif not reset:
                 self.close()

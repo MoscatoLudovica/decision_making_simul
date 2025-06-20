@@ -78,6 +78,7 @@ class GUI_2D(QWidget):
         self.agents_shapes = None
         self.agents_spins = None
         self.running = False
+        self.reset = False
         self.step_requested = False
         logging.info("GUI created successfully")
 
@@ -131,10 +132,12 @@ class GUI_2D(QWidget):
     def start_simulation(self):
         self.gui_control_queue.put("start")
         self.running = True
+        self.reset = False
 
     def reset_simulation(self):
         self.gui_control_queue.put("reset")
         self.running = False
+        self.reset = True
 
     def stop_simulation(self):
         self.gui_control_queue.put("stop")
@@ -144,6 +147,7 @@ class GUI_2D(QWidget):
         if not self.running:
             self.gui_control_queue.put("step")
             self.step_requested = True
+            self.reset = False
 
     def update_spins_plot(self):
         if not (self.clicked_spin and self.agents_spins is not None):
@@ -216,6 +220,16 @@ class GUI_2D(QWidget):
             if self.canvas_visible: self.update_spins_plot()
             self.update()
             self.step_requested = False
+        elif self.reset:
+            while self.gui_in_queue.qsize() > 0:
+                data = self.gui_in_queue.get()
+            self.objects_shapes = {}
+            self.agents_shapes = {}
+            self.agents_spins = {}
+            self.update_scene()
+            self.clicked_spin = None
+            if self.canvas_visible: self.update_spins_plot()
+            self.update()
 
     def draw_arena(self):
         view_width = self.view.viewport().width()
