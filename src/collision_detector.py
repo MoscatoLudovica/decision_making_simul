@@ -97,7 +97,7 @@ class CollisionDetector:
                         out_tmp[n] = correction
                     out[k] = out_tmp
                 dec_agents_out.put(out)
-
+    
 def get_collision_normal(collision_point: Vector3D, shape, max_absolute_velocity: float) -> Vector3D:
     if shape._id == "circle":
         normal_vector = collision_point * -1

@@ -1,7 +1,6 @@
 import os,json,csv
 from config import Config
 
-
 class DataHandlingFactory():
     @staticmethod
     def create_data_handling(config_elem: Config):
