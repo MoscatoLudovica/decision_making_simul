@@ -286,9 +286,9 @@ class MovableAgent(StaticAgent):
 
         if self.moving_behavior == "spin_model":
             self.spin_model_params = config_elem.get("spin_model", {})
-            self.pre_run = self.spin_model_params.get("spin_pre_run", False)
+            self.spin_pre_run_steps = self.spin_model_params.get("spin_pre_run_steps",0)
+            self.pre_run = True if self.spin_pre_run_steps > 0 else False
             self.spin_per_tick = self.spin_model_params.get("spin_per_tick", 3)
-            self.spin_pre_run_steps = self.spin_model_params.get("spin_pre_run_steps",100)
             self.perception_width = self.spin_model_params.get("perception_width",0.5)
             self.num_groups = self.spin_model_params.get("num_groups",32)
             self.num_spins_per_group = self.spin_model_params.get("num_spins_per_group",10)

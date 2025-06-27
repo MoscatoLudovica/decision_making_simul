@@ -60,14 +60,6 @@ class Config:
             spin_model = entity.get("spin_model", None)
             if not spin_model:
                 raise ValueError(f"Agent '{entity.get('_id', 'entity')}' with moving_behavior 'spin_model' must have a 'spin_model' field")
-            required_spin_fields = [
-                "spin_per_tick","spin_pre_run", "spin_pre_run_steps", "perception_width", "num_groups",
-                "num_spins_per_group", "perception_global_inhibition", "T", "J", "nu",
-                "p_spin_up", "time_delay", "dynamics"
-            ]
-            for field in required_spin_fields:
-                if field not in spin_model:
-                    raise ValueError(f"Missing '{field}' in spin_model config for agent {entity.get('_id', 'entity')}")
         list_fields = [f for f in required_fields + optional_fields if f in entity and isinstance(entity[f], list) and f not in ("position","orientation","strength","uncertainty")]
         if not list_fields:
             return [entity]

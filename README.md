@@ -74,8 +74,7 @@ To run the simulations it is provided a run.sh file.
             "moving_behavior":str, **DEFAULT:"random_walk"** - *SUPPORTED:"random_walk","random_way_point","spin_model"*. The last works only with visual detection
             "spin_model":{ **DEFAULT:{}** empty dict -> default configuration
                 "spin_per_tick": int, **DEFAULT:3**
-                "spin_pre_run": bool, **DEFAULT:false**
-                "spin_pre_run_steps": int, **DEFAULT:100**
+                "spin_pre_run_steps": int, **DEFAULT:0** default value avoid pre run steps
                 "perception_width": float, **DEFAULT:0.5**
                 "num_groups": int, **DEFAULT:32**
                 "num_spins_per_group": int, **DEFAULT:10**
