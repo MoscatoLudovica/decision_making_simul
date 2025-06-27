@@ -4,15 +4,11 @@
         "ticks_per_second": 10,
         "time_limit": 0,
         "num_runs": 1,
-        "render": true,
-        "auto_close_gui": true,
         "results":{
-            "save": true, 
             "base_path": "../data/"            
         },
         "gui":{
-            "_id": "2D",
-            "on_click": "show_spins"
+            "_id": "2D"
         },
         "arenas":{
             "arena_0":{
@@ -25,15 +21,11 @@
         },
         "objects":{
             "static_0":{
-                "number": [2],
-                "position": [[-0.4, -0.2, 0],[0.4, -0.2, 0]],
+                "number": [1],
                 "_id": "idle",
                 "shape": "cylinder",
                 "height": 0.2,
-                "diameter": 0.05,
-                "color": "green",
-                "strength": [[5, 5]],
-                "uncertainty": [[0]]
+                "diameter": 0.05
             }
         },
         "agents":{
@@ -50,10 +42,9 @@
                 "moving_behavior":"random_way_point",
                 "messages": {
                     "messages_per_seconds": 2,
-                    "enable": true,
                     "comm_range": 0.1,
                     "type": "broadcast",
-                    "kind": "id"
+                    "kind": "anonymous"
                 }      
             }
         }   

@@ -25,7 +25,7 @@ class Shape:
         self.center = Vector3D(center.x, center.y, center.z)
         self._object = "arena"
         self._id = "point"
-        self._color = config_elem.get("color", "white")
+        self._color = config_elem.get("color", "black")
         self.vertices_list = []
         self.attachments = []
 
@@ -73,7 +73,6 @@ class Shape:
         pass
 
     def check_overlap(self, _shape):
-        # Usa direttamente self.vertices_list invece di self.vertices()
         for vertex in self.vertices_list:
             if _shape._object == "arena":
                 if not self._is_point_inside_shape(vertex, _shape):
@@ -177,7 +176,7 @@ class Sphere(Shape):
 
     def set_vertices(self):
         self.vertices_list = []
-        num_vertices = 32  # Ridotto per efficienza, aumenta se serve più precisione
+        num_vertices = 32
         cx, cy, cz = self.center.x, self.center.y, self.center.z
         r = self.radius
         for i in range(num_vertices):

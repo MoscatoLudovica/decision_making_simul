@@ -1,6 +1,6 @@
 import math
-from random import Random
 import numpy as np
+from random import Random
 
 _PI = math.pi
 
@@ -24,7 +24,6 @@ class SpinSystem:
         self.J_matrix = self._precompute_j_matrix()
 
     def _random_spins(self):
-        # Usa Random per generare una matrice di spin in modo vettoriale
         rand_vals = np.array([Random.uniform(self.random_generator, 0, 1)
                               for _ in range(self.num_groups * self.num_spins_per_group)])
         spins = (rand_vals < self.p_spin_up).astype(np.uint8)

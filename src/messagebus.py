@@ -26,22 +26,23 @@ class MessageBus:
         msg = message
         if self.msg_type == "broadcast":
             for agent in neighbors:
-                msg.update({"from": sender.get_name() if self.kind == "id" else None})
+                msg.update({"from": sender.get_name() if self.kind == "id" else len(self.mailboxes[agent.get_name()])})
                 self.mailboxes[agent.get_name()].append(msg)
         elif self.msg_type == "hand_shake":
             receiver_id = message.get("to")
             for agent in neighbors:
                 if agent.get_name() == receiver_id:
-                    msg.update({"from": sender.get_name() if self.kind == "id" else None})
+                    msg.update({"from": sender.get_name() if self.kind == "id" else len(self.mailboxes[agent.get_name()])})
                     self.mailboxes[agent.get_name()].append(msg)
         elif self.msg_type == "rebroadcast":
             for agent in neighbors:
-                msg.update({"from": sender.get_name() if self.kind == "id" else None})
+                msg.update({"from": sender.get_name() if self.kind == "id" else len(self.mailboxes[agent.get_name()])})
                 self.mailboxes[agent.get_name()].append(msg)
 
     def receive_messages(self, receiver):
         messages = self.mailboxes[receiver.get_name()][:]
         self.mailboxes[receiver.get_name()] = []
+        print(messages)
         return messages
     
     def close(self):

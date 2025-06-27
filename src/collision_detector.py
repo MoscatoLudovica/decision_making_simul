@@ -28,7 +28,7 @@ class CollisionDetector:
                         contra_norm_sum = Vector3D()
                         separations = []
                         if self.collisions:
-                            # Collisioni tra agenti
+                            # Collisions with other agents
                             for dshapes, dvelocities, dvectors, dpositions, dnames in self.agents.values():
                                 for m, dshape in enumerate(dshapes):
                                     dforward_vector = dvectors[m]
@@ -53,7 +53,7 @@ class CollisionDetector:
                                         norm_delta = delta.normalize()
                                         separations.append((norm_delta, penetration_depth * 0.1))
                                         correction = correction + velocity_projection
-                            # Collisioni con oggetti statici
+                            # Collisions with objects
                             for dshapes, dpositions in self.objects.values():
                                 for m, dshape in enumerate(dshapes):
                                     dposition = dpositions[m]
@@ -75,7 +75,7 @@ class CollisionDetector:
                                         correction = correction + velocity_projection
                             if correction is not None:
                                 shape.translate(correction)
-                        # Collisione con l'arena
+                        # Collisions with arena borders
                         overlap = shape.check_overlap(self.arena_shape)
                         if overlap[0]:
                             if correction is None:
@@ -85,7 +85,7 @@ class CollisionDetector:
                             delta_arena = Vector3D(overlap[1].x, overlap[1].y, 0)
                             separations.append((delta_arena.normalize() * -0.001, 1))
                             correction = correction + velocity_projection
-                        # Applica separazioni
+                        # Apply corrections
                         if correction is not None and separations:
                             total_separation = Vector3D()
                             for delta, penetration_depth in separations:

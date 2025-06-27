@@ -26,7 +26,6 @@ class GUI_2D(QWidget):
         self.gui_control_queue = gui_control_queue
         self.setWindowTitle("Arena GUI")
 
-        # Layout principale orizzontale
         self._main_layout = QHBoxLayout()
         self._left_layout = QVBoxLayout()
         self.data_label = QLabel("Waiting for data...")
@@ -265,7 +264,6 @@ class GUI_2D(QWidget):
         offset_x = self.offset_x
         offset_y = self.offset_y
 
-        # Oggetti statici
         if self.objects_shapes is not None:
             for entities in self.objects_shapes.values():
                 for entity in entities:
@@ -281,7 +279,6 @@ class GUI_2D(QWidget):
                     entity_polygon = QPolygonF(entity_vertices)
                     self.scene.addPolygon(entity_polygon, QPen(entity_color, .1), QBrush(entity_color))
 
-        # Agenti
         if self.agents_shapes is not None:
             for key, entities in self.agents_shapes.items():
                 for idx, entity in enumerate(entities):
@@ -296,7 +293,6 @@ class GUI_2D(QWidget):
                     entity_color = QColor(entity.color())
                     entity_polygon = QPolygonF(entity_vertices)
                     self.scene.addPolygon(entity_polygon, QPen(entity_color, .1), QBrush(entity_color))
-                    # Evidenzia agente selezionato
                     if self.clicked_spin is not None and self.clicked_spin[0] == key and self.clicked_spin[1] == idx:
                         xs = [point.x() for point in entity_vertices]
                         ys = [point.y() for point in entity_vertices]
@@ -311,7 +307,6 @@ class GUI_2D(QWidget):
                             QPen(QColor("white"), 1),
                             QBrush(Qt.NoBrush)
                         )
-                    # Attachments
                     attachments = entity.get_attachments()
                     for attachment in attachments:
                         att_vertices = attachment.vertices()

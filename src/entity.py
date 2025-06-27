@@ -28,7 +28,7 @@ class Entity:
         self._id = _id
         self.position_from_dict = False
         self.orientation_from_dict = False
-        self.color = config_elem.get("color","gray")
+        self.color = config_elem.get("color","black")
     
     def get_name(self):
         return self.entity_type+"_"+str(self._id)
@@ -48,7 +48,6 @@ class Entity:
 class Object(Entity):    
     def __init__(self,entity_type:str, config_elem: dict,_id:int=0):
         super().__init__(entity_type,config_elem,_id)
-        self.color = config_elem.get("color","green")
         if not config_elem.get("_id") in ("idle","interactive"):
             raise ValueError(f"Invalid object type: {self.entity_type}")
 
@@ -58,9 +57,9 @@ class Agent(Entity):
         self.random_generator = Random()
         self.ticks_per_second = config_elem.get("ticks_per_second", 31)
         self.color = config_elem.get("color", "blue")
-        # --- Messaggistica ---
+        # --- messaging ---
         self.messages_config = config_elem.get("messages", {})
-        self.msg_enable = self.messages_config.get("enable", False)
+        self.msg_enable = True if len(self.messages_config) > 0 else False
         self.msg_comm_range = self.messages_config.get("comm_range", 0.1)
         self.msg_type = self.messages_config.get("type", "broadcast")
         self.msg_kind = self.messages_config.get("kind", "anonymous")
@@ -112,13 +111,13 @@ class StaticObject(Object):
         self.orientation = Vector3D()
         self.start_position = Vector3D()
         self.start_orientation = Vector3D()
-        temp_strength = config_elem.get("strength", None)
+        temp_strength = config_elem.get("strength", [10])
         if temp_strength != None:
             try:
                 self.strength = temp_strength[_id]
             except:
                 self.strength = temp_strength[-1]
-        temp_uncertainty = config_elem.get("uncertainty", None)
+        temp_uncertainty = config_elem.get("uncertainty", [0])
         if temp_uncertainty != None:
             try:
                 self.uncertainty = temp_uncertainty[_id]
@@ -283,20 +282,19 @@ class MovableAgent(StaticAgent):
         self.prev_goal_distance = 0
         self.detection = config_elem.get("detection","GPS")
         self.moving_behavior = config_elem.get("moving_behavior","random_walk")
-        self.pre_run = False  # default
+        self.pre_run = False
 
         if self.moving_behavior == "spin_model":
             self.spin_model_params = config_elem.get("spin_model", {})
             self.pre_run = self.spin_model_params.get("spin_pre_run", False)
             self.spin_per_tick = self.spin_model_params.get("spin_per_tick", 3)
-            self.spin_pre_run_steps = self.spin_model_params["spin_pre_run_steps"]
-            self.perception_width = self.spin_model_params["perception_width"][0] if isinstance(self.spin_model_params["perception_width"], list) else self.spin_model_params["perception_width"]
-            self.num_groups = self.spin_model_params["num_groups"][0] if isinstance(self.spin_model_params["num_groups"], list) else self.spin_model_params["num_groups"]
-            self.num_spins_per_group = self.spin_model_params["num_spins_per_group"][0] if isinstance(self.spin_model_params["num_spins_per_group"], list) else self.spin_model_params["num_spins_per_group"]
-            self.perception_global_inhibition = self.spin_model_params["perception_global_inhibition"][0] if isinstance(self.spin_model_params["perception_global_inhibition"], list) else self.spin_model_params["perception_global_inhibition"]
+            self.spin_pre_run_steps = self.spin_model_params.get("spin_pre_run_steps",100)
+            self.perception_width = self.spin_model_params.get("perception_width",0.5)
+            self.num_groups = self.spin_model_params.get("num_groups",32)
+            self.num_spins_per_group = self.spin_model_params.get("num_spins_per_group",10)
+            self.perception_global_inhibition = self.spin_model_params.get("perception_global_inhibition",0)
             self.group_angles = np.linspace(0, 2 * _PI, self.num_groups, endpoint=False)
         else:
-            # Parametri per altri moving_behavior
             self.pre_run = False
             self.max_turning_ticks = 160
             self.standard_motion_steps = 5*16
@@ -310,12 +308,12 @@ class MovableAgent(StaticAgent):
                 self.random_generator,
                 self.num_groups,
                 self.num_spins_per_group,
-                self.spin_model_params["T"][0] if isinstance(self.spin_model_params["T"], list) else self.spin_model_params["T"],
-                self.spin_model_params["J"][0] if isinstance(self.spin_model_params["J"], list) else self.spin_model_params["J"],
-                self.spin_model_params["nu"][0] if isinstance(self.spin_model_params["nu"], list) else self.spin_model_params["nu"],
-                self.spin_model_params["p_spin_up"][0] if isinstance(self.spin_model_params["p_spin_up"], list) else self.spin_model_params["p_spin_up"],
-                self.spin_model_params["time_delay"][0] if isinstance(self.spin_model_params["time_delay"], list) else self.spin_model_params["time_delay"],
-                self.spin_model_params["dynamics"][0] if isinstance(self.spin_model_params["dynamics"], list) else self.spin_model_params["dynamics"]
+                float(self.spin_model_params.get("T",0.1)),
+                float(self.spin_model_params.get("J",1)),
+                float(self.spin_model_params.get("nu",0)),
+                float(self.spin_model_params.get("p_spin_up",0.5)),
+                int(self.spin_model_params.get("time_delay",1)),
+                self.spin_model_params.get("dynamics","metropolis")
             )
         else:
             self.turning_ticks = 0
@@ -491,7 +489,7 @@ def normalize_angle(angle: float):
 
 def exponential_distribution(random_generator, alpha):
     u = Random.uniform(random_generator, 0, 1)
-    return -alpha * math.log1p(-u)  # log1p migliora la precisione per valori piccoli
+    return -alpha * math.log1p(-u)
 
 def wrapped_cauchy_pp(random_generator, c: float) -> float:
     q = 0.5

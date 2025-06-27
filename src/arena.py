@@ -33,7 +33,7 @@ class Arena():
         self.agents_shapes = {}
         self.agents_spins = {}
         self.data_handling = None
-        if config_elem.results.get("save",False) and not config_elem.environment.get("render",True): self.data_handling = DataHandlingFactory.create_data_handling(config_elem)
+        if len(config_elem.results) > 0 and not len(config_elem.gui) > 0 : self.data_handling = DataHandlingFactory.create_data_handling(config_elem)
 
     def get_id(self):
         return self._id
@@ -127,10 +127,10 @@ class SolidArena(Arena):
                         entity.to_origin()
                         entity.set_position(rand_pos)
                         shape_n = entity.get_shape()
-                        # Overlap con arena
+                        # Overlap with arena borders
                         if shape_n.check_overlap(self.shape)[0]:
                             done = False
-                        # Overlap con altre entità
+                        # Overlap with other entities
                         if done:
                             for m in range(n_entities):
                                 if m == n:
@@ -302,10 +302,8 @@ class SolidArena(Arena):
                         entity.to_origin()
                         entity.set_position(rand_pos)
                         shape_n = entity.get_shape()
-                        # Overlap con arena
                         if shape_n.check_overlap(self.shape)[0]:
                             done = False
-                        # Overlap con altre entità
                         if done:
                             for m in range(n_entities):
                                 if m == n:

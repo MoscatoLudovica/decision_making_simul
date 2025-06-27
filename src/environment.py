@@ -4,7 +4,7 @@ from config import Config
 from entity import EntityFactory
 from arena import ArenaFactory
 from gui import GuiFactory
-from entity_manager import EntityManager
+from entityManager import EntityManager
 from collision_detector import CollisionDetector
 
 class EnvironmentFactory():
@@ -23,9 +23,8 @@ class Environment():
         self.num_runs = int(config_elem.environment.get("num_runs",1))
         self.time_limit = int(config_elem.environment.get("time_limit",0))
         self.gui_id = config_elem.gui.get("_id","2D")
-        self.render = [config_elem.environment.get("render",False),config_elem.gui]
-        self.auto_close_gui = config_elem.environment.get("auto_close_gui",True)
-        self.collisions = config_elem.environment.get("collisions",True)
+        self.render = [True,config_elem.gui] if len(config_elem.gui)>0 else [False,{}]
+        self.collisions = config_elem.environment.get("collisions",False)
         if not self.render[0] and self.time_limit==0:
             raise Exception("Invalid configuration: infinite experiment with no GUI.")
 
@@ -142,7 +141,7 @@ class SingleProcessEnvironment(Environment):
                             arena.close()
                             entity_manager.close()
                             break
-                    if self.auto_close_gui and not arena_alive:
+                    if not arena_alive:
                         if agents_alive: agents_process.terminate()
                         if detector_alive: detector_process.terminate()
                         if gui_alive: gui_process.terminate()

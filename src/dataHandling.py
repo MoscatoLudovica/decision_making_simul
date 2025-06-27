@@ -11,17 +11,15 @@ class DataHandlingFactory():
 
 class DataHandling():
     def __init__(self, config_elem: Config):
-        base_path = config_elem.results.get("base_path", "../")
+        base_path = config_elem.results.get("base_path", "../data/")
         abs_base_path = os.path.join(os.path.abspath(""), base_path)
         os.makedirs(abs_base_path, exist_ok=True)
-        # Trova il prossimo id disponibile senza scorrere tutta la cartella
         existing = [d for d in os.listdir(abs_base_path) if d.startswith("config_folder_")]
         folder_id = len(existing)
         self.config_folder = os.path.join(abs_base_path, f"config_folder_{folder_id}")
         if os.path.exists(self.config_folder):
             raise Exception(f"Error config folder {self.config_folder} already present")
         os.mkdir(self.config_folder)
-        # Salva config_elem come JSON
         with open(os.path.join(self.config_folder, "config.json"), "w") as f:
             json.dump(config_elem.__dict__, f, indent=4, default=str)
         self.agents_files = {}

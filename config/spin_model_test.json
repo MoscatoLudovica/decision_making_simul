@@ -2,13 +2,10 @@
     "environment":{
         "collisions": false,
         "ticks_per_second": 10,
-        "time_limit": 0,
-        "num_runs": 1,
-        "render": true,
-        "auto_close_gui": true,
+        "time_limit": 100,
+        "num_runs": 2,
         "results":{
-            "save": true, 
-            "base_path": "../data/"            
+            "model_specs": "spin_model"
         },
         "gui":{
             "_id": "2D",
@@ -32,14 +29,14 @@
                 "height": 0.2,
                 "diameter": 0.05,
                 "color": "green",
-                "strength": [[5, 5]],
-                "uncertainty": [[0]]
+                "strength": [5, 5],
+                "uncertainty": [0]
             }
         },
         "agents":{
             "movable_0":{
                 "ticks_per_second": 20,
-                "number": [1],
+                "number": [1,2],
                 "position": [[0, 0.4, 0]],
                 "orientation": [[0,0,90]],
                 "shape": "cylinder",
@@ -54,16 +51,16 @@
                     "spin_per_tick": 10,
                     "spin_pre_run": false,
                     "spin_pre_run_steps": 1000,
-                    "perception_width": [0.2],
-                    "num_groups": [32],
-                    "num_spins_per_group": [10],
-                    "perception_global_inhibition": [0],
-                    "T": [0.3],
-                    "J": [30],
-                    "nu": [0.5],
-                    "p_spin_up": [0.5],
-                    "time_delay": [1],
-                    "dynamics": ["metropolis"]
+                    "perception_width": 0.2,
+                    "num_groups": 32,
+                    "num_spins_per_group": 10,
+                    "perception_global_inhibition": 0,
+                    "T": 0.3,
+                    "J": 30,
+                    "nu": 0.5,
+                    "p_spin_up": 0.5,
+                    "time_delay": 1,
+                    "dynamics": "metropolis"
                 }
             }
         }   

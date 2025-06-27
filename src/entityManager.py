@@ -9,10 +9,8 @@ class EntityManager:
         self.arena_shape = arena_shape
         self.message_buses = {}
         for agent_type, (config,entities) in self.agents.items():
-            # Verifica se almeno una entità ha la messaggistica abilitata
-            any_msg_enabled = any(getattr(e, "msg_enable", False) for e in entities)
+            any_msg_enabled = True if len(config.get("messages",{})) > 0 else False
             if any_msg_enabled:
-                # Crea un bus per questo tipo di entità
                 bus = MessageBus(entities,config.get("messages",{}))
                 self.message_buses[agent_type] = bus
                 for e in entities:
