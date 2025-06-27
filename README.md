@@ -17,7 +17,7 @@ This framework is designed to implement simulations for both single and multi-ag
 After the first download the compile.sh file must be invoked. To give permissions open the terminal at the base folder level and type: sudo chmod +x *.sh. Then type ./compile.sh.
 Now required packages from the requirements.txt file are installed in the virtual environment.
 
-To run the simulations it is provided a run.sh file.
+To run the simulations a run.sh file is provided.
 
 ## Config.json Example
 
