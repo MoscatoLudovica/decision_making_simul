@@ -51,11 +51,11 @@ To run the simulations it is provided a run.sh file.
             "orientation": list(3Dvec), **DEFAULT:None** default assings random intial orientations
             "_id": "str", **Required** - *SUPPORTED:"idle","interactive"*
             "shape": "str", **Required** - *SUPPORTED:"circle","square","rectangle","sphere","cube","cylinder","none"* flat geometry can be used to define walkable areas in the arena
-            "height": int|float, **DEFAULT:1** width and depth used for not-round objects
-            "diameter": int|float, **DEFAULT:1** used for round objects
+            "height": float, **DEFAULT:1** width and depth used for not-round objects
+            "diameter": float, **DEFAULT:1** used for round objects
             "color": "str", **DEFAULT:"black"**
-            "strength": list(int|float), **DEFAULT:[10]** one entry -> assign to all the objects the same value. Less entries tha objects -> missing values are equal to the last one
-            "uncertainty": list(int|float), **DEFAULT:[0]** one entry -> assign to all the objects the same value. Less entries tha objects -> missing values are equal to the last one
+            "strength": list(float), **DEFAULT:[10]** one entry -> assign to all the objects the same value. Less entries tha objects -> missing values are equal to the last one
+            "uncertainty": list(float), **DEFAULT:[0]** one entry -> assign to all the objects the same value. Less entries tha objects -> missing values are equal to the last one
         }
     },
     "agents":{ **Required** can define multiple agents to simulate in the same arena
@@ -65,14 +65,14 @@ To run the simulations it is provided a run.sh file.
             "position": list(3Dvec), **DEFAULT:None** default assings random not-overlapping intial positions
             "orientation": list(3Dvec), **DEFAULT:None** default assings random intial orientations
             "shape": str, - *SUPPORTED:"sphere","cube","cylinder","none"*
-            "linear_velocity": int|float, **DEFAULT:0.01** *m/s*
-            "angular_velocity": int|float, **DEFAULT:360** *deg/s*
-            "height": int|float,
-            "diameter": int|float,
+            "linear_velocity": float, **DEFAULT:0.01** *m/s*
+            "angular_velocity": float, **DEFAULT:360** *deg/s*
+            "height": float,
+            "diameter": float,
             "color": str, **DEFAULT:"blue"**
             "detection": str, **DEFAULT:"GPS"** - *SUPPORTED:"GPS","visual"*
             "moving_behavior":str, **DEFAULT:"random_walk"** - *SUPPORTED:"random_walk","random_way_point","spin_model"*. The last works only with visual detection
-            "spin_model":{
+            "spin_model":{ **DEFAULT:{}** empty dict -> default configuration
                 "spin_per_tick": int, **DEFAULT:3**
                 "spin_pre_run": bool, **DEFAULT:false**
                 "spin_pre_run_steps": int, **DEFAULT:100**
@@ -80,12 +80,18 @@ To run the simulations it is provided a run.sh file.
                 "num_groups": int, **DEFAULT:32**
                 "num_spins_per_group": int, **DEFAULT:10**
                 "perception_global_inhibition": int, **DEFAULT:0**
-                "T": int|float, **DEFAULT:0.5**
-                "J": int|float, **DEFAULT:1**
-                "nu": int|float, **DEFAULT:0**
+                "T": float, **DEFAULT:0.5**
+                "J": float, **DEFAULT:1**
+                "nu": float, **DEFAULT:0**
                 "p_spin_up": float, **DEFAULT:0.5**
                 "time_delay": int, **DEFAULT:1**
                 "dynamics": "metropolis" **DEFAULT:"metropolis"**
+            },
+            "messages":{  **DEFAULT:{}** empty dict -> no messaging
+                "messages_per_seconds": int, **DEFAULT:1**
+                "comm_range": float, **DEFAULT:0.1** *m*
+                "type": str, **DEFAULT:"broadcast"**
+                "kind": str **DEFAULT:"anonymous"**
             }
         }
     }
