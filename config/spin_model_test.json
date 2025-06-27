@@ -2,8 +2,8 @@
     "environment":{
         "collisions": false,
         "ticks_per_second": 10,
-        "time_limit": 100,
-        "num_runs": 2,
+        "time_limit": 0,
+        "num_runs": 1,
         "results":{
             "model_specs": "spin_model"
         },
@@ -36,7 +36,7 @@
         "agents":{
             "movable_0":{
                 "ticks_per_second": 20,
-                "number": [1,2],
+                "number": [1],
                 "position": [[0, 0.4, 0]],
                 "orientation": [[0,0,90]],
                 "shape": "cylinder",

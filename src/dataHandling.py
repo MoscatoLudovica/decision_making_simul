@@ -12,6 +12,7 @@ class DataHandlingFactory():
 class DataHandling():
     def __init__(self, config_elem: Config):
         base_path = config_elem.results.get("base_path", "../data/")
+        self.model_specs = config_elem.results.get("model_specs", "")
         abs_base_path = os.path.join(os.path.abspath(""), base_path)
         os.makedirs(abs_base_path, exist_ok=True)
         existing = [d for d in os.listdir(abs_base_path) if d.startswith("config_folder_")]
@@ -45,29 +46,37 @@ class SpaceDataHandling(DataHandling):
         if shapes is not None:
             for key, entities in shapes.items():
                 for idx, entity in enumerate(entities):
-                    file_path = os.path.join(self.run_folder, f"position_{key}_{idx}.csv")
+                    file_path = os.path.join(self.run_folder, f"{key}_{idx}.csv")
                     if os.path.exists(file_path):
                         raise Exception(f"Error: file {file_path} already exists")
                     f = open(file_path, "w+", newline="")
                     writer = csv.writer(f)
                     com = entity.center_of_mass()
-                    writer.writerow(["x", "y", "z"])
-                    writer.writerow([f"{com.x:.5f}", f"{com.y:.5f}", f"{com.z:.5f}"])
-                    self.agents_files[f"position_{key}_{idx}"] = (f, writer)
+                    header = ["x", "y", "z"]
+                    data = [f"{com.x:.5f}", f"{com.y:.5f}", f"{com.z:.5f}"]
+                    if "spin_model" in self.model_specs:
+                        header.append("spins")
+                        data.append(spins.get(key)[idx][0])
+                    writer.writerow(header)
+                    writer.writerow(data)
+                    self.agents_files[f"{key}_{idx}"] = (f, writer)
 
     def save(self, shapes, spins):
         if shapes is not None:
             for key, entities in shapes.items():
                 for idx, entity in enumerate(entities):
                     com = entity.center_of_mass()
-                    file_writer = self.agents_files[f"position_{key}_{idx}"][1]
-                    file_writer.writerow([f"{com.x:.5f}", f"{com.y:.5f}", f"{com.z:.5f}"])
+                    data = [f"{com.x:.5f}", f"{com.y:.5f}", f"{com.z:.5f}"]
+                    if "spin_model" in self.model_specs:
+                        data.append(spins.get(key)[idx][0])
+                    file_writer = self.agents_files[f"{key}_{idx}"][1]
+                    file_writer.writerow(data)
 
     def close(self, shapes):
         if shapes is not None:
             for key, entities in shapes.items():
                 for idx, _ in enumerate(entities):
-                    file_handle = self.agents_files[f"position_{key}_{idx}"][0]
+                    file_handle = self.agents_files[f"{key}_{idx}"][0]
                     file_handle.flush()
                     file_handle.close()
             self.agents_files.clear()
