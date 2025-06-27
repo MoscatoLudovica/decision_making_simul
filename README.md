@@ -21,6 +21,7 @@ To run the simulations a run.sh file is provided.
 
 ## Config.json Example
 
+```json
 {
 "environment":{
     "collisions": bool, **DEFAULT:false**
@@ -96,3 +97,4 @@ To run the simulations a run.sh file is provided.
     }
 }
 }
+```
