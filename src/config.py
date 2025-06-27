@@ -56,10 +56,6 @@ class Config:
             tmp = entity['uncertainty']
             if not isinstance(tmp, list) and all(isinstance(t, (int,float)) for t in tmp):
                 raise ValueError(f"Optional field 'strength' must be a list of int|float in {entity.get('_id', 'entity')}")
-        if entity.get("moving_behavior", None) == "spin_model":
-            spin_model = entity.get("spin_model", None)
-            if not spin_model:
-                raise ValueError(f"Agent '{entity.get('_id', 'entity')}' with moving_behavior 'spin_model' must have a 'spin_model' field")
         list_fields = [f for f in required_fields + optional_fields if f in entity and isinstance(entity[f], list) and f not in ("position","orientation","strength","uncertainty")]
         if not list_fields:
             return [entity]
