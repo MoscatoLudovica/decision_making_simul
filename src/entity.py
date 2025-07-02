@@ -66,7 +66,8 @@ class Agent(Entity):
         self.msgs_per_sec = self.messages_config.get("messages_per_seconds", 1)
         self.msg_ticks_interval = max(1, int(self.ticks_per_second / self.msgs_per_sec))
         self.message_bus = None
-        self.message = {}
+        self.own_message = {}
+        self.messages = []
 
     def set_message_bus(self, bus):
         self.message_bus = bus
@@ -75,13 +76,15 @@ class Agent(Entity):
         return self.msg_enable and ((tick - 1) % self.msg_ticks_interval == 0)
 
     def send_message(self,tick):
-        if self.msg_enable and self.message_bus:
-            self.message = {"tick":tick}
-            self.message_bus.send_message(self, self.message)
+        if self.should_send_message(tick) and self.message_bus:
+            self.own_message = {"tick":tick}
+            self.message_bus.send_message(self, self.own_message)
 
     def receive_messages(self):
         if self.msg_enable and self.message_bus:
-            return self.message_bus.receive_messages(self)
+            messages = self.message_bus.receive_messages(self)
+            if len(messages) > 0: self.messages.extend(messages)
+            return messages
         return []
     
     def ticks(self): return self.ticks_per_second
@@ -421,6 +424,7 @@ class MovableAgent(StaticAgent):
         self.perception = perception
 
     def run(self,tick,arena_shape,objects):
+        print(self.messages,'\n')
         if self.detection == "visual":
             self.spins_routine(objects)
         elif self.detection == "GPS":
@@ -484,7 +488,7 @@ class MovableAgent(StaticAgent):
         return super().close()
     
 def normalize_angle(angle: float):
-    """Normalizza l'angolo tra -180 e 180 gradi."""
+    """Normalize the angle between -180 e 180 degrees."""
     return ((angle + 180) % 360) - 180
 
 def exponential_distribution(random_generator, alpha):

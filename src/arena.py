@@ -143,7 +143,7 @@ class SolidArena(Arena):
                                     break
                         count += 1
                         if done:
-                            entity.set_start_position(rand_pos, False)
+                            entity.set_start_position(rand_pos)
                     if not done:
                         raise Exception(f"Impossible to place object {entity.entity()} in the arena")
                 else:
@@ -291,13 +291,12 @@ class SolidArena(Arena):
                     done = False
                     shape_n = entity.get_shape()
                     shape_type_n = entity.get_shape_type()
-                    min_vert_z = abs(shape_n.min_vert().z)
                     while not done and count < 500:
                         done = True
                         rand_pos = Vector3D(
                             Random.uniform(rng, min_v.x, max_v.x),
                             Random.uniform(rng, min_v.y, max_v.y),
-                            min_vert_z
+                            position.z
                         )
                         entity.to_origin()
                         entity.set_position(rand_pos)
@@ -316,7 +315,7 @@ class SolidArena(Arena):
                                     break
                         count += 1
                         if done:
-                            entity.set_start_position(rand_pos, False)
+                            entity.set_start_position(rand_pos)
                     if not done:
                         raise Exception(f"Impossible to place object {entity.entity()} in the arena")
                 else:

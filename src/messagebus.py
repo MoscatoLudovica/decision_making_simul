@@ -6,7 +6,6 @@ class MessageBus:
         self.comm_range = self.global_config.get("comm_range", 0.1)
         self.msg_type = self.global_config.get("type", "broadcast")
         self.kind = self.global_config.get("kind", "anonymous")
-        self.enable = self.global_config.get("enable", False)
         self.grid = SpatialGrid(self.comm_range)
         self.mailboxes = {agent.get_name(): [] for agent in agent_entities}
 
@@ -19,30 +18,26 @@ class MessageBus:
         for k in self.mailboxes:
             self.mailboxes[k] = []
 
-    def send_message(self, sender, message):
-        if not self.enable:
-            return
+    def send_message(self, sender, msg):
         neighbors = self.grid.neighbors(sender, self.comm_range)
-        msg = message
         if self.msg_type == "broadcast":
             for agent in neighbors:
-                msg.update({"from": sender.get_name() if self.kind == "id" else len(self.mailboxes[agent.get_name()])})
+                msg.update({"from": sender.get_name() if self.kind == "id" else None})
                 self.mailboxes[agent.get_name()].append(msg)
         elif self.msg_type == "hand_shake":
-            receiver_id = message.get("to")
+            receiver_id = msg.get("to")
             for agent in neighbors:
                 if agent.get_name() == receiver_id:
-                    msg.update({"from": sender.get_name() if self.kind == "id" else len(self.mailboxes[agent.get_name()])})
+                    msg.update({"from": sender.get_name() if self.kind == "id" else None})
                     self.mailboxes[agent.get_name()].append(msg)
         elif self.msg_type == "rebroadcast":
             for agent in neighbors:
-                msg.update({"from": sender.get_name() if self.kind == "id" else len(self.mailboxes[agent.get_name()])})
+                msg.update({"from": sender.get_name() if self.kind == "id" else None})
                 self.mailboxes[agent.get_name()].append(msg)
 
     def receive_messages(self, receiver):
         messages = self.mailboxes[receiver.get_name()][:]
         self.mailboxes[receiver.get_name()] = []
-        print(messages)
         return messages
     
     def close(self):
