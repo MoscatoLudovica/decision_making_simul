@@ -85,7 +85,8 @@ To run the simulations a run.sh file is provided.
                 "nu": float, DEFAULT:0
                 "p_spin_up": float, DEFAULT:0.5
                 "time_delay": int, DEFAULT:1
-                "dynamics": "metropolis" DEFAULT:"metropolis"
+                "reference": str, DEFAULT:"egocentric"
+                "dynamics": str DEFAULT:"metropolis"
             },
             "messages":{  DEFAULT:{} empty dict -> no messaging
                 "messages_per_seconds": int, DEFAULT:1
