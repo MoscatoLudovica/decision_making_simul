@@ -146,8 +146,10 @@ class EntityManager:
                 for _, entities in self.agents.values():
                     for entity in entities:
                         if getattr(entity, "msg_enable", False) and entity.message_bus:
-                            if entity.should_send_message(t):
-                                entity.send_message(t)
+                            entity.send_message(t)
+                for _, entities in self.agents.values():
+                    for entity in entities:
+                        if getattr(entity, "msg_enable", False) and entity.message_bus:
                             entity.receive_messages()
                         entity.run(t, self.arena_shape, data_in["objects"])
                 agents_data = {
@@ -158,10 +160,6 @@ class EntityManager:
                 detector_data = {
                     "agents": self.pack_detector_data()
                 }
-                for agent_type, _ in self.agents.items():
-                    bus = self.message_buses.get(agent_type)
-                    if bus:
-                        bus.reset_mailboxes()
                 agents_queue.put(agents_data)
                 dec_agents_in.put(detector_data)
                 dec_data_in = dec_agents_out.get()

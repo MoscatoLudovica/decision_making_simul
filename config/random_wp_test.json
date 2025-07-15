@@ -21,7 +21,7 @@
         },
         "objects":{
             "static_0":{
-                "number": [1],
+                "number": [3],
                 "_id": "idle",
                 "shape": "cylinder",
                 "height": 0.2,

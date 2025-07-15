@@ -66,7 +66,8 @@ class Agent(Entity):
         self.msgs_per_sec = self.messages_config.get("messages_per_seconds", 1)
         self.msg_ticks_interval = max(1, int(self.ticks_per_second / self.msgs_per_sec))
         self.message_bus = None
-        self.message = {}
+        self.own_message = {}
+        self.messages = []
 
     def set_message_bus(self, bus):
         self.message_bus = bus
@@ -75,13 +76,15 @@ class Agent(Entity):
         return self.msg_enable and ((tick - 1) % self.msg_ticks_interval == 0)
 
     def send_message(self,tick):
-        if self.msg_enable and self.message_bus:
-            self.message = {"tick":tick}
-            self.message_bus.send_message(self, self.message)
+        if self.should_send_message(tick) and self.message_bus:
+            self.own_message = {"tick":tick}
+            self.message_bus.send_message(self, self.own_message)
 
     def receive_messages(self):
         if self.msg_enable and self.message_bus:
-            return self.message_bus.receive_messages(self)
+            messages = self.message_bus.receive_messages(self)
+            if len(messages) > 0: self.messages.extend(messages)
+            return messages
         return []
     
     def ticks(self): return self.ticks_per_second
@@ -293,6 +296,7 @@ class MovableAgent(StaticAgent):
             self.num_groups = self.spin_model_params.get("num_groups",32)
             self.num_spins_per_group = self.spin_model_params.get("num_spins_per_group",10)
             self.perception_global_inhibition = self.spin_model_params.get("perception_global_inhibition",0)
+            self.reference = self.spin_model_params.get("reference","egocentric")
             self.group_angles = np.linspace(0, 2 * _PI, self.num_groups, endpoint=False)
         else:
             self.pre_run = False
@@ -395,13 +399,13 @@ class MovableAgent(StaticAgent):
     
     def spin_pre_run(self,objects):
         if self.pre_run:
-            self.update_visual_detection(objects)
+            self.update_detection(objects)
             for _ in range(self.spin_pre_run_steps):
                 self.spin_system.step(timedelay=False)
             self.spin_system.set_p_spin_up(np.mean(self.spin_system.get_states()))
             self.spin_system.reset_spins()
 
-    def update_visual_detection(self, objects):
+    def update_detection(self, objects):
         perception = np.zeros(self.num_groups * self.num_spins_per_group)
         sigma0 = self.perception_width
         for _, (shapes, positions, strengths, uncertainties) in objects.items():
@@ -409,7 +413,9 @@ class MovableAgent(StaticAgent):
                 dx = positions[n].x - self.position.x
                 dy = positions[n].y - self.position.y
                 angle_to_object = math.degrees(math.atan2(-dy, dx))
-                angle_to_object = normalize_angle(angle_to_object - self.orientation.z)
+                if self.reference == "egocentric":
+                    angle_to_object = angle_to_object - self.orientation.z
+                angle_to_object = normalize_angle(angle_to_object)
                 effective_width = sigma0 + uncertainties[n]
                 angle_diffs = np.abs(self.group_angles - math.radians(angle_to_object))
                 angle_diffs = np.minimum(angle_diffs, 2 * _PI - angle_diffs)
@@ -433,11 +439,13 @@ class MovableAgent(StaticAgent):
     def spins_routine(self, objects):
         self.prev_position = self.position
         self.prev_orientation = self.orientation
-        self.update_visual_detection(objects)
+        self.update_detection(objects)
         self.spin_system.update_external_field(self.perception)
         self.spin_system.run_spins(steps=self.spin_per_tick)
         angle_rad = self.spin_system.average_direction_of_activity()
         if angle_rad is not None:
+            if self.reference == "allocentric":
+                angle_rad = angle_rad - math.radians(self.orientation.z)
             angle_deg = normalize_angle(math.degrees(angle_rad))
             angle_deg = max(min(angle_deg, self.max_angular_velocity), -self.max_angular_velocity)
             self.delta_orientation = Vector3D(0, 0, angle_deg)
@@ -484,7 +492,7 @@ class MovableAgent(StaticAgent):
         return super().close()
     
 def normalize_angle(angle: float):
-    """Normalizza l'angolo tra -180 e 180 gradi."""
+    """Normalize the angle between -180 e 180 degrees."""
     return ((angle + 180) % 360) - 180
 
 def exponential_distribution(random_generator, alpha):
