@@ -287,6 +287,36 @@ class MovableAgent(StaticAgent):
         self.moving_behavior = config_elem.get("moving_behavior","random_walk")
         self.pre_run = False
 
+
+        # we define the number of bins of visual filed(angular resolution)
+        self.num_visual_bins = config_elem.get("visual_bins",36)
+        # dimension of agents
+        self.agent_size = config_elem.get("agent_size",0.1)
+
+        self.visual_mode = config_elem.get("visual_mode","binary")  # "binary" or "area"
+
+        # coefficients from the paper (α0, α1, α2, β0, β1, β2, γ, v0)
+        self.alpha0 = float(config_elem.get("alpha0", 1.0))
+        self.alpha1 = float(config_elem.get("alpha1", 0.0))
+        self.alpha2 = float(config_elem.get("alpha2", 0.0))
+        self.beta0  = float(config_elem.get("beta0", 1.0))
+        self.beta1  = float(config_elem.get("beta1", 0.0))
+        self.beta2  = float(config_elem.get("beta2", 0.0))
+
+        self.gamma = float(config_elem.get("gamma", 1.0))
+        
+        # prefered speed (in same units as self.max_absolute_velocity)
+        self.v0_pref = float(config_elem.get("v0", self.max_absolute_velocity))
+
+         # internal state for time derivative
+        self.prev_visual_field = None
+
+        # scalar speed (magnitude of forward vector) — gestito esplicitamente
+        self.speed = self.forward_vector.magnitude() if hasattr(self,'forward_vector') else self.max_absolute_velocity
+
+
+
+
         if self.moving_behavior == "spin_model":
             self.spin_model_params = config_elem.get("spin_model", {})
             self.spin_pre_run_steps = self.spin_model_params.get("spin_pre_run_steps",0)
@@ -298,12 +328,157 @@ class MovableAgent(StaticAgent):
             self.perception_global_inhibition = self.spin_model_params.get("perception_global_inhibition",0)
             self.reference = self.spin_model_params.get("reference","egocentric")
             self.group_angles = np.linspace(0, 2 * _PI, self.num_groups, endpoint=False)
+        elif self.moving_behavior == "vision":
+            vm = config_elem.get("vision_model", {})
+            self.visual_bins = vm.get("visual_bins", 72)
+            self.body_length = vm.get("body_length", 0.1)
+            self.visual_mode = vm.get("visual_mode", "binary")
+        
+            self.alpha0 = float(vm.get("alpha0", 1.0))
+            self.alpha1 = float(vm.get("alpha1", 0.0))
+            self.alpha2 = float(vm.get("alpha2", 0.0))
+            self.beta0  = float(vm.get("beta0", 1.0))
+            self.beta1  = float(vm.get("beta1", 0.0))
+            self.beta2  = float(vm.get("beta2", 0.0))
+            self.gamma  = float(vm.get("gamma", 1.0))
+            self.v0_pref = float(vm.get("v0", self.max_absolute_velocity))
+        
+            self.prev_visual_field = None
+            self.speed = self.max_absolute_velocity
         else:
             self.pre_run = False
             self.max_turning_ticks = 160
             self.standard_motion_steps = 5*16
             self.crw_exponent = config_elem.get("crw_exponent",1)
             self.levy_exponent = config_elem.get("levy_exponent",1.75)
+
+
+
+
+    """ OUR PROJECT"""
+    
+    def build_visual_field(self, objects):
+        """
+        Restituisce V(φ) discretizzato su self.visual_bins (array di lunghezza N)
+        - V in modalita 'binary' => 0/1 per bin (1 se coperto da almeno un oggetto)
+        - V in modalita 'area' => somma dei contributi (poi eventualmente clip)
+        objects: formato come nel tuo codice: for _, (shapes, positions, strengths, uncertainties) in objects.items()
+        """
+        N = self.visual_bins
+        V = np.zeros(N, dtype=float)
+        angles = np.linspace(-math.pi, math.pi, N, endpoint=False)  # φ_k in radianti
+        bin_width = 2 * math.pi / N
+        my_orient_rad = math.radians(self.orientation.z)
+
+        for _, (shapes, positions, strengths, uncertainties) in objects.items():
+            for n in range(len(positions)):
+                pos = positions[n]
+                dx = pos.x - self.position.x
+                dy = pos.y - self.position.y
+                dist = math.hypot(dx, dy)
+
+                # angolo globale (radianti) e relativo (egocentrico)
+                angle_global = math.atan2(-dy, dx)            # come nel tuo codice (attenzione al -dy)
+                rel_angle = ((angle_global - my_orient_rad) + math.pi) % (2 * math.pi) - math.pi
+
+                # half-angle approssimato dalla geometria BL/dist
+                BL = max(1e-6, self.body_length)
+                if dist <= 1e-9:
+                    half_angle = math.pi  # oggetto sovrapposto -> tutto il campo
+                else:
+                    half_angle = math.atan((BL / 2.0) / dist)  # in radianti
+
+                # per ogni bin controlla se il centro del bin è coperto (metodo semplice e robusto)
+                # alternativa: integrare la sovrapposizione angolare per bin (più preciso)
+                for k, phi_k in enumerate(angles):
+                    # distanza angolare minima
+                    diff = abs(((phi_k - rel_angle + math.pi) % (2*math.pi)) - math.pi)
+                    if diff <= half_angle:
+                        # modalità: 'binary' -> 1, 'area' -> somma (poi clip)
+                        if self.visual_mode == "binary":
+                            V[k] = 1.0
+                        else:
+                            # peso proporzionale all'angolo sotteso (in radianti)
+                            V[k] += 2.0 * half_angle  # oppure += (2*half_angle)/ (2*pi) per normalizzare
+
+        # Se vuoi evitare saturazione totale in binary cap a 1:
+        if self.visual_mode == "binary":
+            V = np.minimum(V, 1.0)
+
+        return V, angles, bin_width
+    
+    def vision_routine(self, tick, arena_shape, objects):
+        """
+        Implementazione discreta delle eq. (3) e (4) del paper.
+        Output: aggiorna self.speed, self.orientation, self.forward_vector.
+        """
+
+        # 1) costruisco V(φ)
+        V, angles, bin_width = self.build_visual_field(objects)  # V in [0,1] o area
+        N = self.visual_bins
+        dt = 1.0 / float(self.ticks_per_second)
+
+        # 2) calcolo ∂φ V discretamente (gradient)
+        dV_dphi = np.gradient(V, bin_width)   # ∂φ V (in unità di V per rad)
+
+        # salvo per il passo successivo
+        self.prev_visual_field = V.copy()
+
+        # 4) costruisco integrandi per eq. (3) (accelerazione) e (4) (virata)
+        # integrand_acc(φ) = cos(φ) * α0 * ( -V + α1*(∂φV)^2 + α2 * ∂tV )
+        # integrand_turn(φ) = sin(φ) * β0 * ( -V + β1*(∂φV)^2 + β2 * ∂tV )
+        # NOTA: α0 e β0 sono fattori esterni moltiplicativi (li applico dopo la somma)
+        term_acc_inside = -V + self.alpha1 * (dV_dphi ** 2) 
+        term_turn_inside = -V + self.beta1 * (dV_dphi ** 2)
+
+        integrand_acc = np.cos(angles) * term_acc_inside
+        integrand_turn = np.sin(angles) * term_turn_inside
+
+        # 5) integra (somma) sul dominio φ
+        integral_acc = np.sum(integrand_acc) * bin_width   # approssimazione dell'integrale su φ
+        integral_turn = np.sum(integrand_turn) * bin_width
+
+        # 6) applico α0 e β0 (come in eq.)
+        vis_contrib_acc = self.alpha0 * integral_acc
+        vis_contrib_turn = self.beta0 * integral_turn
+
+        # 7) termine di rilassamento verso v0 (F_ind = γ (v0 - v))
+        current_speed = self.speed
+        relax_term = self.gamma * (self.v0_pref - current_speed)
+
+        # 8) derivata della velocità scalare dv/dt
+        dv_dt = relax_term + vis_contrib_acc
+
+        # 9) derivata dell'angolo dψ/dt (in radianti al secondo)
+        dpsi_dt = vis_contrib_turn
+
+        # 10) integrazione esplicita (passo dt)
+        new_speed = current_speed + dv_dt * dt
+        
+        # clamp speed >= 0, e (opzionale) <= qualche limite ragionevole
+        # new_speed = max(0.0, new_speed)
+        # max_allowed_speed = getattr(self, "max_speed", self.max_absolute_velocity * 3.0)
+        #new_speed = min(new_speed, max_allowed_speed)
+        
+        self.speed = new_speed
+
+        # 11) aggiorna orientazione (attenzione: orientation.z è in gradi nel tuo codice)
+        delta_angle_deg = math.degrees(dpsi_dt * dt)   # dpsi_dt è rad/s -> moltiplico per dt -> rad -> converto in deg
+        self.delta_orientation = Vector3D(0, 0, delta_angle_deg)
+        self.orientation = self.orientation + self.delta_orientation
+        self.orientation.z = normalize_angle(self.orientation.z)  # mantiene in [-180,180]
+
+        # 12) aggiorna forward_vector coerente con speed e orientazione
+        ang_rad = math.radians(self.orientation.z)
+        self.forward_vector = Vector3D(self.speed * math.cos(ang_rad),self.speed * -math.sin(ang_rad),0)
+
+        # 13) posizione e shape: spostamento per tick (come nel tuo run)
+        self.position = self.position + self.forward_vector
+        # aggiorna shape come fai nel run (rotate/translate)
+        self.shape.rotate(self.delta_orientation.z)
+        self.shape.translate(self.position)
+        self.shape.translate_attachments(self.orientation.z)
+
 
     def reset(self):
         if self.moving_behavior == "spin_model":
@@ -428,7 +603,7 @@ class MovableAgent(StaticAgent):
 
     def run(self,tick,arena_shape,objects):
         if self.detection == "visual":
-            self.spins_routine(objects)
+            self.vision_routine(tick,arena_shape,objects)
         elif self.detection == "GPS":
             self.GPS_routine(tick,arena_shape)
         self.position = self.position + self.forward_vector

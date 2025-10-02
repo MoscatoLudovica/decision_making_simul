@@ -46,21 +46,19 @@
                 "diameter": 0.033,
                 "color": "blue",
                 "detection": "visual",
-                "moving_behavior":"spin_model",
-                "spin_model":{
-                    "spin_per_tick": 10,
-                    "spin_pre_run_steps": 0,
-                    "perception_width": 0.2,
-                    "num_groups": 10,
-                    "num_spins_per_group": 10,
-                    "perception_global_inhibition": 0,
-                    "T": 0.3,
-                    "J": 30,
-                    "nu": 0.5,
-                    "p_spin_up": 0.5,
-                    "time_delay": 1,
-                    "reference": "egocentric",
-                    "dynamics": "metropolis"
+                "moving_behavior":"vision",
+                "vision_model": {
+                    "visual_bins": 72,
+                    "body_length": 0.05,
+                    "visual_mode": "binary",
+                    "alpha0": 1.0,
+                    "alpha1": 0.0,
+                    "alpha2": 0.0,
+                    "beta0": 1.0,
+                    "beta1": 0.0,
+                    "beta2": 0.0,
+                    "gamma": 1.0,
+                    "v0": 0.02
                 }
             }
         }   
