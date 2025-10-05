@@ -196,27 +196,72 @@ class StaticAgent(Agent):
         super().__init__(entity_type,config_elem,_id)
         if config_elem.get("shape") in ("sphere","cube","cuboid","cylinder"):
             self.shape_type = "dense"
-        self.shape = Shape3DFactory.create_shape("agent",config_elem.get("shape","point"), {key:val for key,val in config_elem.items()})
-        self.shape.add_attachment(Shape3DFactory.create_shape("mark","circle", {"_id":"idle", "color":"red", "diameter":0.01}))
+        else:
+            # Aggiunto un fallback per evitare errori se la forma non è densa
+            self.shape_type = "flat" 
+
+        # --- INIZIO BLOCCO MODIFICATO ---
+
+        # 1. Creiamo un dizionario pulito solo con i parametri per la forma
+        # Questo evita di passare l'intero dizionario di configurazione dell'agente (che contiene liste)
+        # alla factory della forma, che si aspetta valori singoli.
+        shape_params = {
+            "color": config_elem.get("color", "blue"),
+            "diameter": config_elem.get("diameter"),
+            "height": config_elem.get("height"),
+            # Aggiungi qui altri parametri specifici della forma se ne hai (es. width, depth)
+        }
+
+        # 2. Creiamo la forma con i parametri puliti
+        self.shape = Shape3DFactory.create_shape("agent", config_elem.get("shape", "point"), shape_params)
+        self.shape.add_attachment(Shape3DFactory.create_shape("mark", "circle", {"_id": "idle", "color": "red", "diameter": 0.01}))
+
+        # 3. Inizializziamo i vettori di posizione e orientamento
         self.position = Vector3D()
         self.orientation = Vector3D()
         self.start_position = Vector3D()
         self.start_orientation = Vector3D()
+
+        # 4. Leggiamo la posizione dal dizionario, usando una logica robusta con _id
         temp_position = config_elem.get("position", None)
-        if temp_position != None:
+        if temp_position is not None:
             self.position_from_dict = True
             try:
-                self.start_position = Vector3D(temp_position[0],temp_position[1],temp_position[2])
-            except:
-                self.start_position = Vector3D(temp_position[-1][0],temp_position[-1][1],temp_position[-1][2])
+                # Caso principale: una lista di posizioni. Prendi quella corrispondente al mio _id.
+                pos_data = temp_position[_id]
+                self.start_position = Vector3D(pos_data[0], pos_data[1], pos_data[2])
+            except (IndexError, TypeError):
+                # Caso di fallback:
+                # 1. C'è una lista di posizioni ma _id è fuori range -> prendi l'ultima.
+                # 2. C'è una sola posizione definita per tutti gli agenti (es. [[x,y,z]]).
+                # 3. C'è una sola posizione definita come lista semplice (es. [x,y,z]).
+                if isinstance(temp_position[0], list):
+                    # È una lista di liste, prendi l'ultima come default
+                    pos_data = temp_position[-1]
+                else:
+                    # È una singola lista [x, y, z]
+                    pos_data = temp_position
+                self.start_position = Vector3D(pos_data[0], pos_data[1], pos_data[2])
+
+        # 5. Leggiamo l'orientamento (logica simile a quella della posizione)
         temp_orientation = config_elem.get("orientation", None)
-        if temp_orientation != None:
+        if temp_orientation is not None:
             self.orientation_from_dict = True
             try:
-                self.start_orientation = Vector3D(temp_orientation[0],temp_orientation[1],temp_orientation[2])
-            except:
-                self.start_orientation = Vector3D(temp_orientation[-1][0],temp_orientation[-1][1],temp_orientation[-1][2])
+                # Caso principale: lista di orientamenti.
+                orient_data = temp_orientation[_id]
+                self.start_orientation = Vector3D(orient_data[0], orient_data[1], orient_data[2])
+            except (IndexError, TypeError):
+                # Caso di fallback.
+                if isinstance(temp_orientation[0], list):
+                    orient_data = temp_orientation[-1]
+                else:
+                    orient_data = temp_orientation
+                self.start_orientation = Vector3D(orient_data[0], orient_data[1], orient_data[2])
+            
             self.orientation = self.start_orientation
+
+        # --- FINE BLOCCO MODIFICATO ---
 
     def to_origin(self):
         self.position = Vector3D()
@@ -296,14 +341,14 @@ class MovableAgent(StaticAgent):
         self.visual_mode = config_elem.get("visual_mode","binary")  # "binary" or "area"
 
         # coefficients from the paper (α0, α1, α2, β0, β1, β2, γ, v0)
-        self.alpha0 = float(config_elem.get("alpha0", 1.0))
-        self.alpha1 = float(config_elem.get("alpha1", 0.0))
+        self.alpha0 = float(config_elem.get("alpha0", 0.5))
+        self.alpha1 = float(config_elem.get("alpha1", 0.5))
         self.alpha2 = float(config_elem.get("alpha2", 0.0))
-        self.beta0  = float(config_elem.get("beta0", 1.0))
-        self.beta1  = float(config_elem.get("beta1", 0.0))
+        self.beta0  = float(config_elem.get("beta0", 0.5))
+        self.beta1  = float(config_elem.get("beta1", 0.5))
         self.beta2  = float(config_elem.get("beta2", 0.0))
 
-        self.gamma = float(config_elem.get("gamma", 1.0))
+        self.gamma = float(config_elem.get("gamma", 0.3))
         
         # prefered speed (in same units as self.max_absolute_velocity)
         self.v0_pref = float(config_elem.get("v0", self.max_absolute_velocity))
@@ -353,68 +398,82 @@ class MovableAgent(StaticAgent):
             self.levy_exponent = config_elem.get("levy_exponent",1.75)
 
 
-
-
     """ OUR PROJECT"""
     
-    def build_visual_field(self, objects):
+    def build_visual_field(self, objects, all_entities):
         """
-        Restituisce V(φ) discretizzato su self.visual_bins (array di lunghezza N)
-        - V in modalita 'binary' => 0/1 per bin (1 se coperto da almeno un oggetto)
-        - V in modalita 'area' => somma dei contributi (poi eventualmente clip)
-        objects: formato come nel tuo codice: for _, (shapes, positions, strengths, uncertainties) in objects.items()
+        Restituisce V(φ) discretizzato. Ora include sia oggetti che altri agenti.
         """
         N = self.visual_bins
         V = np.zeros(N, dtype=float)
-        angles = np.linspace(-math.pi, math.pi, N, endpoint=False)  # φ_k in radianti
+        angles = np.linspace(-math.pi, math.pi, N, endpoint=False)
         bin_width = 2 * math.pi / N
         my_orient_rad = math.radians(self.orientation.z)
-
+    
+        # --- PRIMO LOOP: Processa gli OGGETTI STATICI (come prima) ---
         for _, (shapes, positions, strengths, uncertainties) in objects.items():
             for n in range(len(positions)):
                 pos = positions[n]
                 dx = pos.x - self.position.x
                 dy = pos.y - self.position.y
                 dist = math.hypot(dx, dy)
-
-                # angolo globale (radianti) e relativo (egocentrico)
-                angle_global = math.atan2(-dy, dx)            # come nel tuo codice (attenzione al -dy)
+                angle_global = math.atan2(-dy, dx)
                 rel_angle = ((angle_global - my_orient_rad) + math.pi) % (2 * math.pi) - math.pi
-
-                # half-angle approssimato dalla geometria BL/dist
                 BL = max(1e-6, self.body_length)
-                if dist <= 1e-9:
-                    half_angle = math.pi  # oggetto sovrapposto -> tutto il campo
-                else:
-                    half_angle = math.atan((BL / 2.0) / dist)  # in radianti
-
-                # per ogni bin controlla se il centro del bin è coperto (metodo semplice e robusto)
-                # alternativa: integrare la sovrapposizione angolare per bin (più preciso)
+                if dist <= 1e-9: half_angle = math.pi
+                else: half_angle = math.atan((BL / 2.0) / dist)
                 for k, phi_k in enumerate(angles):
-                    # distanza angolare minima
                     diff = abs(((phi_k - rel_angle + math.pi) % (2*math.pi)) - math.pi)
                     if diff <= half_angle:
-                        # modalità: 'binary' -> 1, 'area' -> somma (poi clip)
-                        if self.visual_mode == "binary":
-                            V[k] = 1.0
-                        else:
-                            # peso proporzionale all'angolo sotteso (in radianti)
-                            V[k] += 2.0 * half_angle  # oppure += (2*half_angle)/ (2*pi) per normalizzare
-
-        # Se vuoi evitare saturazione totale in binary cap a 1:
+                        if self.visual_mode == "binary": V[k] = 1.0
+                        else: V[k] += 2.0 * half_angle
+    
+        # --- SECONDO LOOP: Processa gli ALTRI AGENTI (CORRETTO) ---
+        for other_agent in all_entities:
+            # Salta se l'entità sono io stesso
+            if other_agent is self:
+                continue
+            
+            pos = other_agent.get_position()
+            dx = pos.x - self.position.x
+            dy = pos.y - self.position.y
+            dist = math.hypot(dx, dy)
+    
+            # Se un agente è troppo lontano, ignoralo per performance
+            if dist > 2.0: # Puoi regolare questa "distanza di percezione"
+                continue
+    
+            angle_global = math.atan2(-dy, dx)
+            rel_angle = ((angle_global - my_orient_rad) + math.pi) % (2 * math.pi) - math.pi
+            
+            # Per la repulsione, usiamo il diametro fisico dell'agente per calcolare la sua dimensione apparente
+            agent_diameter = self.shape.diameter if hasattr(self.shape, 'diameter') else 0.033
+            BL = max(1e-6, agent_diameter)
+            
+            if dist <= 1e-9: half_angle = math.pi
+            else: half_angle = math.atan((BL / 2.0) / dist)
+    
+            for k, phi_k in enumerate(angles):
+                diff = abs(((phi_k - rel_angle + math.pi) % (2*math.pi)) - math.pi)
+                if diff <= half_angle:
+                    # Tratta gli altri agenti come ostacoli, quindi imposta V a 1.0
+                    V[k] = 1.0
+        
         if self.visual_mode == "binary":
             V = np.minimum(V, 1.0)
-
-        return V, angles, bin_width
     
-    def vision_routine(self, tick, arena_shape, objects):
+        return V, angles, bin_width
+        
+    
+    def vision_routine(self, tick, arena_shape, objects, all_entities):
         """
         Implementazione discreta delle eq. (3) e (4) del paper.
         Output: aggiorna self.speed, self.orientation, self.forward_vector.
         """
-
+        #print(f"TICK {tick}: Agente {self.get_name()} sta usando >>> VISION_ROUTINE <<<")
+        
         # 1) costruisco V(φ)
-        V, angles, bin_width = self.build_visual_field(objects)  # V in [0,1] o area
+        V, angles, bin_width = self.build_visual_field(objects, all_entities)  # V in [0,1] o area
         N = self.visual_bins
         dt = 1.0 / float(self.ticks_per_second)
 
@@ -471,13 +530,6 @@ class MovableAgent(StaticAgent):
         # 12) aggiorna forward_vector coerente con speed e orientazione
         ang_rad = math.radians(self.orientation.z)
         self.forward_vector = Vector3D(self.speed * math.cos(ang_rad),self.speed * -math.sin(ang_rad),0)
-
-        # 13) posizione e shape: spostamento per tick (come nel tuo run)
-        self.position = self.position + self.forward_vector
-        # aggiorna shape come fai nel run (rotate/translate)
-        self.shape.rotate(self.delta_orientation.z)
-        self.shape.translate(self.position)
-        self.shape.translate_attachments(self.orientation.z)
 
 
     def reset(self):
@@ -601,9 +653,9 @@ class MovableAgent(StaticAgent):
         perception -= self.perception_global_inhibition
         self.perception = perception
 
-    def run(self,tick,arena_shape,objects):
+    def run(self,tick,arena_shape,objects,all_entities):
         if self.detection == "visual":
-            self.vision_routine(tick,arena_shape,objects)
+            self.vision_routine(tick,arena_shape,objects,all_entities)
         elif self.detection == "GPS":
             self.GPS_routine(tick,arena_shape)
         self.position = self.position + self.forward_vector
@@ -639,6 +691,7 @@ class MovableAgent(StaticAgent):
             )
 
     def GPS_routine(self, tick, arena_shape):
+        print(f"TICK {tick}: Agente {self.get_name()} sta usando >>> GPS_ROUTINE <<<")
         if self.moving_behavior == "random_walk":
             self.random_walk(tick)
         elif self.moving_behavior == "random_way_point":
