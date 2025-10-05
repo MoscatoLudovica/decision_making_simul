@@ -143,6 +143,17 @@ class EntityManager:
                     if bus:
                         for _, (_,entities) in self.agents.items():
                             bus.update_grid(entities)
+                
+                ### INIZIO MODIFICA ###
+                
+                # 1. Creiamo una lista piatta di tutte le istanze degli agenti.
+                # Questa lista verrà passata a ogni agente in modo che possano "vedersi" a vicenda.
+                all_agent_instances = []
+                for _, agent_list in self.agents.values():
+                    all_agent_instances.extend(agent_list)
+    
+                ### FINE MODIFICA ###
+    
                 for _, entities in self.agents.values():
                     for entity in entities:
                         if getattr(entity, "msg_enable", False) and entity.message_bus:
@@ -151,7 +162,13 @@ class EntityManager:
                     for entity in entities:
                         if getattr(entity, "msg_enable", False) and entity.message_bus:
                             entity.receive_messages()
-                        entity.run(t, self.arena_shape, data_in["objects"])
+                        
+                        ### INIZIO MODIFICA ###
+                        # 2. Passiamo la lista completa degli agenti come nuovo argomento al metodo run.
+                        # L'agente `entity` userà questa lista per percepire i suoi vicini.
+                        entity.run(t, self.arena_shape, data_in["objects"], all_agent_instances)
+                        ### FINE MODIFICA ###
+    
                 agents_data = {
                     "status": [t, ticks_per_second],
                     "agents_shapes": self.get_agent_shapes(),
