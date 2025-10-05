@@ -1,7 +1,7 @@
 {
     "environment":{
         "collisions": false,
-        "ticks_per_second": 10,
+        "ticks_per_second": 1,
         "time_limit": 0,
         "num_runs": 1,
         "results":{
@@ -23,7 +23,7 @@
         "objects":{
             "static_0":{
                 "number": [2],
-                "position": [[-0.4, -0.2, 0],[0.4, -0.2, 0]],
+                "position": [[-0.4, -0.4, 0],[0.4, -0.2, 0]],
                 "_id": "idle",
                 "shape": "cylinder",
                 "height": 0.2,
@@ -35,10 +35,16 @@
         },
         "agents":{
             "movable_0":{
-                "ticks_per_second": 15,
+                "ticks_per_second": 1,
                 "number": [5],
-                "position": [[0, 0.4, 0]],
-                "orientation": [[0,0,90]],
+                "position": [
+                    [-0.2, 0.4, 0],
+                    [-0.1, 0.4, 0],
+                    [ 0.0, 0.4, 0],
+                    [ 0.1, 0.4, 0],
+                    [ 0.2, 0.4, 0]
+                ],
+                "orientation": [[0,0,0]],
                 "shape": "cylinder",
                 "linear_velocity": 0.02,
                 "angular_velocity": 45,
@@ -49,18 +55,18 @@
                 "moving_behavior":"vision",
                 "vision_model": {
                     "visual_bins": 72,
-                    "body_length": 0.05,
+                    "body_length": 0.5,
                     "visual_mode": "binary",
-                    "alpha0": 1.0,
-                    "alpha1": 0.0,
+                    "alpha0": 0.0,
+                    "alpha1": 0.2,
                     "alpha2": 0.0,
-                    "beta0": 1.0,
-                    "beta1": 0.0,
+                    "beta0": 0.2,
+                    "beta1": 0.9,
                     "beta2": 0.0,
-                    "gamma": 1.0,
-                    "v0": 0.02
+                    "gamma": 0.3,
+                    "v0": 0.002
                 }
             }
-        }   
+        }
     }
 }
