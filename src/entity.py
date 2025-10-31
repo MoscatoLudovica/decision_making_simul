@@ -513,7 +513,7 @@ class MovableAgent(StaticAgent):
 
         # 10) integrazione esplicita (passo dt)
         new_speed = current_speed + dv_dt * dt
-        
+        new_speed = max(0.0, min(new_speed, self.max_absolute_velocity))
         # clamp speed >= 0, e (opzionale) <= qualche limite ragionevole
         # new_speed = max(0.0, new_speed)
         # max_allowed_speed = getattr(self, "max_speed", self.max_absolute_velocity * 3.0)
@@ -529,8 +529,9 @@ class MovableAgent(StaticAgent):
 
         # 12) aggiorna forward_vector coerente con speed e orientazione
         ang_rad = math.radians(self.orientation.z)
-        self.forward_vector = Vector3D(self.speed * math.cos(ang_rad),self.speed * -math.sin(ang_rad),0)
-
+        scaling_factor = 1.0 
+        self.forward_vector = (Vector3D(self.speed *scaling_factor* math.cos(ang_rad),self.speed *scaling_factor* -math.sin(ang_rad),0))
+        print(self.forward_vector)
 
     def reset(self):
         if self.moving_behavior == "spin_model":
@@ -658,7 +659,8 @@ class MovableAgent(StaticAgent):
             self.vision_routine(tick,arena_shape,objects,all_entities)
         elif self.detection == "GPS":
             self.GPS_routine(tick,arena_shape)
-        self.position = self.position + self.forward_vector
+        dt = 1.0/self.ticks_per_second
+        self.position = self.position + self.forward_vector*dt
         self.shape.rotate(self.delta_orientation.z)
         self.shape.translate(self.position)
         self.shape.translate_attachments(self.orientation.z)
@@ -681,6 +683,9 @@ class MovableAgent(StaticAgent):
             angle_rad = math.radians(self.orientation.z)
             width = self.spin_system.get_width_of_activity()
             scaling_factor = 1.0 / width if width and width > 0 else 0.0
+            print("!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+            print(f"sto stampando width {width}")
+            print(f"sto stampando scaling_factor {scaling_factor}")
             scaling_factor = np.clip(scaling_factor, 0.0, 1.0)
             cos_angle = math.cos(angle_rad)
             sin_angle = math.sin(angle_rad)
