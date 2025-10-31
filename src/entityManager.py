@@ -2,6 +2,9 @@ import multiprocessing as mp
 from messagebus import MessageBus
 from random import Random
 from geometry_utils.vector3D import Vector3D
+import csv
+import numpy as np
+import os
 
 class EntityManager:
     def __init__(self, agents, arena_shape):
@@ -80,6 +83,29 @@ class EntityManager:
                 entity.shape.translate_attachments(entity.orientation.z)
                 entity.spin_pre_run(objects)
 
+    ##----- For polarization and center of mass calculator-----
+    @staticmethod
+    def compute_polarization(agents):
+        """
+        Calcola la polarizzazione istantanea del gruppo.
+        agents: lista di agenti con attributo forward_vector (Vector3D)
+        """
+        directions = []
+        for ag in agents:
+            v = ag.forward_vector
+            mag = np.sqrt(v.x**2 + v.y**2 + v.z**2)
+            if mag > 0:
+                directions.append(np.array([v.x/mag, v.y/mag, v.z/mag]))
+        if len(directions) == 0:
+            return 0.0
+        mean_dir = np.mean(directions, axis=0)
+        return np.linalg.norm(mean_dir)
+
+    @staticmethod
+    def compute_center_of_mass(agents):
+        positions = np.array([[ag.position.x, ag.position.y, ag.position.z] for ag in agents])
+        return np.mean(positions, axis=0)
+
     def close(self):
         for agent_type, (config,entities) in self.agents.items():
             bus = self.message_buses.get(agent_type)
@@ -103,6 +129,22 @@ class EntityManager:
             data_in = arena_queue.get()
             if data_in["status"][0] == 0:
                 self.initialize(data_in["random_seed"], data_in["objects"])
+
+                ## inizio modifiche
+                # --- METRICHE DI GRUPPO ---
+                polarization_over_time = []
+                center_of_mass_over_time = []
+                all_agent_instances = []
+
+                # Creiamo lista piatta di agenti
+                for _, agent_list in self.agents.values():
+                    all_agent_instances.extend(agent_list)
+
+                # Calcolo del centro di massa iniziale
+                Rcm_start = self.compute_center_of_mass(all_agent_instances)
+                #secompute_center_of_mass(all_agent_instances)
+                # --- FINE METRICHE DI GRUPPO ---
+
             for agent_type, _ in self.agents.items():
                 bus = self.message_buses.get(agent_type)
                 if bus:
@@ -167,6 +209,14 @@ class EntityManager:
                         # 2. Passiamo la lista completa degli agenti come nuovo argomento al metodo run.
                         # L'agente `entity` userà questa lista per percepire i suoi vicini.
                         entity.run(t, self.arena_shape, data_in["objects"], all_agent_instances)
+
+                        # --- METRICHE PER OGNI TICK ---
+                        P = self.compute_polarization(all_agent_instances)
+                        Rcm = self.compute_center_of_mass(all_agent_instances)
+                        polarization_over_time.append(P)
+                        center_of_mass_over_time.append(Rcm)
+                        # --- FINE METRICHE PER OGNI TICK ---
+
                         ### FINE MODIFICA ###
     
                 agents_data = {
@@ -191,6 +241,52 @@ class EntityManager:
                 t += 1
             if t < ticks_limit and not reset:
                 break
+            # --- RISULTATI FINALI DELLA RUN ---
+            if len(polarization_over_time) > 0 and len(center_of_mass_over_time) > 0:
+                polarization_mean = np.mean(polarization_over_time)
+                Rcm_end = center_of_mass_over_time[-1]
+                Rcm_displacement = np.linalg.norm(Rcm_end - Rcm_start)
+            
+                print(f"\nRun {run} completata:")
+                print(f"  Polarizzazione media = {polarization_mean:.3f}")
+                print(f"  Spostamento centro di massa = {Rcm_displacement:.3f}")
+
+                                # Numero di tick da salvare a inizio/fine
+                N = 8000
+
+                # Se la simulazione è più breve di 40 tick, salvi tutto
+                #total_ticks = len(polarization_over_time)
+                #if total_ticks <= 2 * N:
+                #    indices_to_save = range(total_ticks)
+                #else:
+                #    indices_to_save = list(range(N)) + list(range(total_ticks - N, total_ticks))
+
+                # Calcolo medie finali
+                polarization_mean = np.mean(polarization_over_time)
+                Rcm_mean = np.mean(center_of_mass_over_time, axis=0)
+
+                # Scrittura CSV
+                print(f"Scrivo CSV per run {run}, ticks {t}")
+                folder = "results"
+                os.makedirs(folder, exist_ok=True)
+                filename = f"results_run_{run}_.csv"
+                full_path = os.path.join(folder, filename)  # percorso corretto
+                with open(full_path, "w", newline="") as f:  # "w" sovrascrive sempre
+                    writer = csv.writer(f)
+                    writer.writerow(["tick", "polarization", "Rcm_x", "Rcm_y"])
+                    for i, R in enumerate(center_of_mass_over_time):
+                        writer.writerow([i, polarization_over_time[i], R[0], R[1]])
+                    ## Riga finale con medie
+                    writer.writerow([])
+                    writer.writerow(["mean", polarization_mean, Rcm_mean[0], Rcm_mean[1]])
+
+                print("File esiste?", os.path.exists(full_path))
+                print("Il CSV è stato salvato in:", os.path.abspath(full_path))
+
+
+                
+            # --- FINE RISULTATI ---
+
             if run < num_runs:
                 while arena_queue.qsize() > 1:
                     data_in = arena_queue.get()
@@ -221,3 +317,6 @@ class EntityManager:
         for _, entities in self.agents.values():
             spins[entities[0].entity()] = [entity.get_spin_system_data() for entity in entities]
         return spins
+
+
+
