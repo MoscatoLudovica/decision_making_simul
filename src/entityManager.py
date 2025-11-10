@@ -117,9 +117,10 @@ class EntityManager:
 
     def run(self, num_runs, time_limit, arena_queue: mp.Queue, agents_queue: mp.Queue, dec_agents_in: mp.Queue, dec_agents_out: mp.Queue, render: bool = False):
         ticks_per_second = 1
-        for (_, entities) in self.agents.values():
-            ticks_per_second = entities[0].ticks()
-            break
+        for agent_type, (_, entities) in self.agents.items():
+            if entities:
+                tps = entities[0].ticks()
+                print(f"  - {agent_type}: {tps} ticks/s")
         ticks_limit = time_limit * ticks_per_second + 1 if time_limit > 0 else 0
         run = 1
         while run < num_runs + 1:
@@ -301,7 +302,9 @@ class EntityManager:
             shapes = [entity.get_shape() for entity in entities]
             velocities = [entity.get_max_absolute_velocity() for entity in entities]
             vectors = [entity.get_forward_vector() for entity in entities]
-            positions = [entity.get_prev_position() for entity in entities]
+            # [CORREZIONE] Usa la posizione CORRENTE, non quella precedente.
+            # Questo assicura che la posizione del Vector3D e la posizione interna della shape siano sincronizzate.
+            positions = [entity.get_position() for entity in entities] # <-- CORRETTO
             names = [entity.get_name() for entity in entities]
             out[entities[0].entity()] = (shapes, velocities, vectors, positions, names)
         return out
